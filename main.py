@@ -6,24 +6,18 @@ def simp(val):
     if "+" in val:
         return (float(val.strip("+")) + 2)
     elif "DNF" in val:
-        return "DNF"
+        return st.session_state.DNF
     else:
         return float(val)
     
 def remv(lst):
-    dnf_count = lst.count("DNF")
 
-    nums = [x for x in lst if x != "DNF"]
-    nums.sort()
+    lst.sort()
 
-    if len(nums) >= 2:
-        nums = nums[1:-1]  
+    lst.pop(0)
+    lst.pop(-1)
 
-    for _ in range(dnf_count):
-        if nums:
-            nums.pop(-1) 
-
-    return nums
+    return lst
 
 def avg(lst):
 
@@ -48,6 +42,9 @@ def best_time(df):
         if solve_val < current_best:
             best_times[int(solve["No."])] = float(solve_val)
             current_best = solve_val
+
+
+    st.subheader("Best Times")
 
     df = pd.DataFrame(
     list(best_times.items()),
@@ -81,6 +78,8 @@ def best_avg(df, num):
             current_best = solve_val
 
 
+    st.subheader(f"Best Averages of {num}", text_alignment="center")
+
     df = pd.DataFrame(
     list(best_times.items()),
     columns=["x", "y"]
@@ -88,13 +87,12 @@ def best_avg(df, num):
 
     df = df.sort_values("x")
 
-    st.line_chart(df, x="x", y="y", height="content")
+    st.line_chart(df, x="x", y="y", x_label="No.", y_label="Times", height="content")
 
     #st.write(best_times)
 
 def all_avg(df, num):
     times = {}
-    current_best = 100
 
     for i in range (num ,len(df) - 1):
         solve_vals = []
@@ -108,8 +106,9 @@ def all_avg(df, num):
 
         
         times[int(solve["No."] + num - 1)] = float(solve_val)
-        current_best = solve_val
 
+
+    st.subheader(f"All Averages of {num}", text_alignment="center")
 
     df = pd.DataFrame(
     list(times.items()),
@@ -118,7 +117,7 @@ def all_avg(df, num):
 
     df = df.sort_values("x")
 
-    st.line_chart(df, x="x", y="y", height="content")
+    st.line_chart(df, x="x", y="y", x_label="No.", y_label="Times", height="content")
 
     #st.write(times)
 
@@ -130,30 +129,27 @@ def main():
 
     if uploaded_file is not None:
         try:
-            # Check file extension and read accordingly
             if uploaded_file.name.endswith('.csv'):
                 df = pd.read_csv(uploaded_file)
             elif uploaded_file.name.endswith('.xlsx'):
                 df = pd.read_excel(uploaded_file)
-
-            # Display the dataframe
-            st.write("Uploaded Data:")
-            st.dataframe(df)
         except Exception as e:
             st.error(f"Error reading file: {e}")
     else:
         st.warning("Please upload a CSV or Excel file.")
 
+    st.session_state.DNF = st.number_input("DNFs interpreted as:", 0)
+
+    choice = st.multiselect("Which to display", [5, 12, 50, 100, 200, 500, 1000, 2000])
+
     with st.expander("Show Bests"):
         best_time(df)
-        best_avg(df, 5)
-        best_avg(df, 12)
-        best_avg(df, 100)
+        for i in range (len(choice)):
+            best_avg(df, choice[i])
 
-    with st.expander("Show All"):
-        all_avg(df, 5)
-        all_avg(df, 12)
-        all_avg(df, 100)
+    with st.expander("Show Averages"):
+        for i in range (len(choice)):
+            all_avg(df, choice[i])
 
 
     

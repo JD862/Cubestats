@@ -19,14 +19,7 @@ def remv(lst):
 
     return lst
 
-def avg(lst):
 
-    sum = 0
-    for i in range (len(lst)):
-        sum += lst[i]
-
-    avg = sum / len(lst)
-    return round(avg, 3)
 
 def best_time(df):
     best_times = {}
@@ -70,7 +63,7 @@ def best_avg(df, num):
             solve_vals.append(simp(solve["Time"]))
 
         solve_vals = remv(solve_vals)
-        solve_val = avg(solve_vals)
+        solve_val = round(sum(solve_vals) / len(solve_vals), 3)
 
         
         if solve_val < current_best:
@@ -102,7 +95,7 @@ def all_avg(df, num):
             solve_vals.append(simp(solve["Time"]))
 
         solve_vals = remv(solve_vals)
-        solve_val = avg(solve_vals)
+        solve_val = round(sum(solve_vals) / len(solve_vals), 3)
 
         
         times[int(solve["No."] + num - 1)] = float(solve_val)
@@ -121,27 +114,7 @@ def all_avg(df, num):
 
     #st.write(times)
 
-def main():
-    st.title("Cubing Statistics")
-
-
-    uploaded_file = st.file_uploader("Upload a CSV or Excel file", type=["csv", "xlsx"])
-
-    if uploaded_file is not None:
-        try:
-            if uploaded_file.name.endswith('.csv'):
-                df = pd.read_csv(uploaded_file)
-            elif uploaded_file.name.endswith('.xlsx'):
-                df = pd.read_excel(uploaded_file)
-        except Exception as e:
-            st.error(f"Error reading file: {e}")
-    else:
-        st.warning("Please upload a CSV or Excel file.")
-
-    st.session_state.DNF = st.number_input("DNFs interpreted as:", 0)
-
-    choice = st.multiselect("Which to display", [5, 12, 50, 100, 200, 500, 1000, 2000])
-
+def calculate(df, choice):
     col1, col2 = st.columns(2)
 
     with col1:
@@ -154,6 +127,37 @@ def main():
         with st.expander("Show Averages"):
             for i in range (len(choice)):
                 all_avg(df, choice[i])
+
+
+def main():
+    st.title("Cubing Statistics")
+
+    with st.form("Input data"):
+
+        uploaded_file = st.file_uploader("Upload a CSV or Excel file", type=["csv", "xlsx"])
+
+    
+        if uploaded_file is not None:
+            try:
+                if uploaded_file.name.endswith('.csv'):
+                    df = pd.read_csv(uploaded_file)
+                elif uploaded_file.name.endswith('.xlsx'):
+                    df = pd.read_excel(uploaded_file)
+            except Exception as e:
+                st.error(f"Error reading file: {e}")
+        else:
+            st.warning("Please upload a CSV or Excel file.")
+
+        st.session_state.DNF = st.number_input("DNFs interpreted as:", 0)
+
+        choice = st.multiselect("Which to display", [5, 12, 50, 100, 200, 500, 1000, 2000])
+
+        submit = st.form_submit_button("Submit")
+
+    if submit:
+        calculate(df, choice)
+
+    
 
 
     

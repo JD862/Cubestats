@@ -142,14 +142,18 @@ def main():
 
     choice = st.multiselect("Which to display", [5, 12, 50, 100, 200, 500, 1000, 2000])
 
-    with st.expander("Show Bests"):
-        best_time(df)
-        for i in range (len(choice)):
-            best_avg(df, choice[i])
+    col1, col2 = st.columns(2)
 
-    with st.expander("Show Averages"):
-        for i in range (len(choice)):
-            all_avg(df, choice[i])
+    with col1:
+        with st.expander("Show Bests"):
+            with st.expander("Show one Best"):
+                best_time(df)
+            for i in range (len(choice)):
+                best_avg(df, choice[i])
+    with col2:
+        with st.expander("Show Averages"):
+            for i in range (len(choice)):
+                all_avg(df, choice[i])
 
 
     

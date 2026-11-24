@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cubestats</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><h1>Cubestats</h1>
+  <div class="actions">
+    <button id="open" class="primary">Import files</button><button id="wcaopen">Import from WCA</button><button id="paste">Paste times</button>
+    <button id="manage">Session manager</button>
+    <button id="export">Export CSV</button><button id="remove">Remove session</button>
+  </div>
+  <input id="file" type="file" multiple hidden>
+</header>
+<p id="msg" role="status"></p>
+<section id="empty"><h2>Drop your solves here</h2>
+  <p>csTimer exports (.txt, .json or .csv), Excel workbooks, or plain lists of times. Any number of files, any size. Everything stays on this computer. You can also download your official results from the WCA.</p>
+</section>
+<main id="main" hidden>
+  <form id="filters">
+    <label>Session<select id="session"></select></label>
+    <label id="linkbox" hidden>WCA event<select id="wcaevent"></select></label>
+    <label id="showbox" hidden>Show<select id="show"><option value="both">In and out of comp</option><option value="out">Out of comp only</option><option value="in">In comp only</option></select></label>
+    <label>Range<select id="preset"><option value="all">All solves</option><option value="100">Last 100</option><option value="1000">Last 1,000</option><option value="5000">Last 5,000</option><option value="custom">Custom</option></select></label>
+    <label>From solve<input id="from" type="number" min="1"></label>
+    <label>To solve<input id="to" type="number" min="1"></label>
+    <div class="field"><span id="sizeslabel">Average sizes</span>
+      <details id="sizemenu"><summary id="sizesum" aria-labelledby="sizeslabel sizesum"></summary>
+        <div class="menu"><div id="sizelist" role="group" aria-labelledby="sizeslabel"></div>
+          <div class="addrow"><input id="custom" type="number" min="2" step="1" placeholder="Other size" aria-label="Other average size"><button type="button" id="addsize">Add</button></div>
+        </div></details>
+      <input id="sizes" type="hidden"></div>
+    <label>DNF counts as<select id="dnfmode"><option value="dnf">DNF (standard rules)</option><option value="remove">Removed</option><option value="pair">Also removes best time</option><option value="time">Fixed time</option></select></label>
+    <label id="dnfbox" hidden>DNF time (s)<input id="dnf" type="number" min="0" step="any" placeholder="Enter seconds"></label>
+    <label>A “+” time<select id="plus"><option value="add">Needs 2s added</option><option value="inc">Already includes 2s</option></select></label>
+  </form>
+  <section id="tiles"></section>
+  <section class="card"><h2>Averages</h2><div class="scroll"><table id="table"></table></div></section>
+  <section id="wca"></section>
+  <section id="charts"></section>
+</main>
+<dialog id="dlg"><form method="dialog"><h2>Paste times</h2>
+  <label>Session name<input id="pname" value="Pasted"></label>
+  <label>Times<textarea id="ptext" rows="10" placeholder="12.34, 1:02.50, 11.08+, DNF"></textarea></label>
+  <div class="actions"><button type="button" id="cancel">Cancel</button><button value="ok" class="primary">Add times</button></div>
+</form></dialog>
+<dialog id="mgr" aria-labelledby="mgrtitle"><div class="mgrbody"><h2 id="mgrtitle">Session Manager</h2>
+  <div class="scroll"><table id="mgrtable"></table></div>
+  <div class="actions"><button type="button" id="mgrclose">Close</button></div></div></dialog>
+<dialog id="wcadlg"><form id="wcaform"><h2>Import from WCA</h2>
+  <label>WCA ID<input id="wcaid" autocomplete="off" spellcheck="false" placeholder="2009ABCD01"></label>
+  <p class="note">Downloads that person's public results from worldcubeassociation.org. Your practice solves are not sent.</p>
+  <p id="wcaerr" class="note" role="status"></p>
+  <div class="actions"><button type="button" id="wcacancel">Cancel</button><button id="wcago" class="primary">Import results</button></div>
+</form></dialog>
+<dialog id="ask" aria-labelledby="asktext"><p id="asktext"></p>
+  <div class="actions"><button type="button" id="askno">Cancel</button><button type="button" id="askyes" class="primary"></button></div></dialog>
+<div id="tip" hidden></div>
+<script src="stats.js"></script><script src="import.js"></script><script src="wca.js"></script><script src="app.js"></script><script src="manager.js"></script>
+</body>
+</html>

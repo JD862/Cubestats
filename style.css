@@ -121,3 +121,5 @@ button.alg:hover{text-decoration:underline}
 #algpickbox{text-align:left;margin-bottom:14px}
 #algpick{width:100%;font:15px ui-monospace,Consolas,monospace}
 .algbody .primary:disabled{opacity:.45}
+#sidebar strong{display:flex;align-items:center;gap:8px}
+#sidebar strong img{flex:none;border-radius:6px}

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><title>Cubestats</title>
+<defs><linearGradient id="b" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#172a2c"/><stop offset="1" stop-color="#0b1518"/></linearGradient>
+<linearGradient id="t" gradientUnits="userSpaceOnUse" x1="446" y1="66" x2="66" y2="446"><stop stop-color="#5ff0c4"/><stop offset="1" stop-color="#0f9c86"/></linearGradient></defs>
+<rect width="512" height="512" rx="112" fill="url(#b)"/>
+<rect x="66" y="66" width="112" height="112" rx="26" fill="#2a4345"/>
+<rect x="200" y="66" width="112" height="112" rx="26" fill="#2a4345"/>
+<rect x="334" y="66" width="112" height="112" rx="26" fill="url(#t)"/>
+<rect x="66" y="200" width="112" height="112" rx="26" fill="#2a4345"/>
+<rect x="200" y="200" width="112" height="112" rx="26" fill="url(#t)"/>
+<rect x="334" y="200" width="112" height="112" rx="26" fill="url(#t)"/>
+<rect x="66" y="334" width="112" height="112" rx="26" fill="url(#t)"/>
+<rect x="200" y="334" width="112" height="112" rx="26" fill="url(#t)"/>
+<rect x="334" y="334" width="112" height="112" rx="26" fill="url(#t)"/>
+</svg>

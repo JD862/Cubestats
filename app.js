@@ -186,21 +186,20 @@ function histogram(times) {
 }
 const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 function activity(solves) {
-  const key = dayKey;
   const m = new Map();
   let min = Infinity, max = -Infinity;
   for (const s of solves) {
     if (s.date == null) continue;
-    const k = key(new Date(s.date));
+    const k = dayKey(new Date(s.date));
     m.set(k, (m.get(k) || 0) + 1);
     min = Math.min(min, s.date);
     max = Math.max(max, s.date);
   }
   if (!m.size || max - min > 864e5 * 36525) return []; // a span over a century means bad dates
-  const out = [], d = new Date(min), end = key(new Date(max));
+  const out = [], d = new Date(min), end = dayKey(new Date(max));
   d.setHours(12, 0, 0, 0);
   for (;;) {
-    const k = key(d);
+    const k = dayKey(d);
     out.push({ n: m.get(k) || 0, label: k, tip: k });
     if (k >= end) return out;
     d.setDate(d.getDate() + 1);
@@ -450,7 +449,6 @@ WCA.init();
   try {
     const s = await getKV('settings');
     if (s) for (const f of FIELDS) if (s[f] != null) $(f).value = s[f];
-    if (s && s.dnf && !s.dnfmode) $('dnfmode').value = 'time'; // settings saved before DNF modes existed
     sessions = (await getKV('sessions')) || [];
     WCA.load(await getKV('wca'));
   } catch { say('This browser cannot save data between visits.'); }

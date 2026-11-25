@@ -453,12 +453,10 @@ const Trainer = (() => {
     try { page = localStorage.getItem('cubestats-page') === 'trainer' ? 'trainer' : 'stats'; } catch { /* default page */ }
     showPage(page);
     try { const s = await getKV('trainer'); if (s) st = { ...st, ...s };
-      if (s && s.set && !s.groups) st.groups = { '3x3': s.set }; // saved before events existed
-      delete st.set;
       if (!ALG_EVENTS[st.event]) st.event = '3x3'; } catch { /* starts empty */ }
     ready = true;
     refresh();
   }
-  return { init, check };
+  return { init };
 })();
 Trainer.init();

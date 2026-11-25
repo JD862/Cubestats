@@ -82,5 +82,5 @@ const Stats = (() => {
     const s = ((u - m * 60 * f) / f).toFixed(digits), padded = s.padStart(digits ? digits + 3 : 2, '0');
     return h ? `${h}:${String(m % 60).padStart(2, '0')}:${padded}` : m ? `${m}:${padded}` : s;
   }
-  return { rolling, records, summary, format, trimCount };
+  return { rolling, records, summary, format };
 })();

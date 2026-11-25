@@ -131,7 +131,7 @@ const Cube = (() => {
     }
     return cells;
   }
-  return { solved, apply, parse, simplify, invert, turnY, text, difficulty, keepsF2L, oriented, reached, maskedF2L, isoView, topView };
+  return { solved, apply, parse, simplify, invert, turnY, text, difficulty, keepsF2L, reached, maskedF2L, isoView, topView };
 })();
 
 const ALG_SETS = (() => {

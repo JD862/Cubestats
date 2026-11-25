@@ -187,5 +187,5 @@ const Import = (() => {
     if (b[0] === 0xd0 && b[1] === 0xcf) throw new Error('old .xls format; save it as .xlsx or CSV');
     return fromText(new TextDecoder(b[0] === 0xff && b[1] === 0xfe ? 'utf-16le' : 'utf-8').decode(buf), name);
   }
-  return { fromFile, fromText, parseTime };
+  return { fromFile, fromText };
 })();

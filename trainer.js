@@ -5,13 +5,19 @@ const Trainer = (() => {
   const GREY = '#77777a', LAST_LAYER = ['oll', 'eoll', 'cpll', 'pll', 'ort', 'cll', 'pbl'], TWO = ['ort', 'cll', 'pbl'];
   // results: { caseId: [{ t, d }] } with t in ms, or null for a miss. off: case ids left out of training.
   // groups: the group last used in each event.
-  let st = { event: '3x3', groups: { '3x3': 'PLL' }, order: 'random', band: 'all', sort: 'set', learnt: [], show: 'all', picture: true, listBand: 'all', listShow: 'all', caseGroup: 'all', listGroup: 'all', listPicture: true, off: [], results: {}, edits: {}, alt: {}, useAlt: [], custom: [] };
+  const DEFAULTS = { event: '3x3', groups: { '3x3': 'PLL' }, order: 'random', band: 'all', sort: 'set', learnt: [], show: 'all', picture: true, listBand: 'all', listShow: 'all', caseGroup: 'all', listGroup: 'all', listPicture: true, off: [], results: {}, edits: {}, alt: {}, useAlt: [], custom: [] };
+  let st = structuredClone(DEFAULTS);
   let cur = null, queue = [], phase = 'idle', started = 0, frame = 0, last = null, editing = null, ready = false;
 
-  const store = () => setKV('trainer', st).catch(() => { $('trmsg').textContent = SAVE_FAILED; });
-  const groupNames = () => [...Object.keys(ALG_EVENTS[st.event]), 'Custom'];
+  const store = () => ready && setKV('trainer', st).catch(() => { $('trmsg').textContent = SAVE_FAILED; });
+  const groupNames = () => [...Object.keys(ALG_EVENTS[st.event]), 'Custom', 'Learnt'];
   const group = () => (groupNames().includes(st.groups[st.event]) ? st.groups[st.event] : groupNames()[0]);
-  const cases = () => (group() === 'Custom' ? st.custom.filter(c => (c.event || '3x3') === st.event) : ALG_EVENTS[st.event][group()]);
+  const customCases = () => st.custom.filter(c => (c.event || '3x3') === st.event);
+  const cases = () => {
+    if (group() === 'Custom') return customCases();
+    if (group() === 'Learnt') return [...Object.values(ALG_EVENTS[st.event]).flat(), ...customCases()].filter(isLearnt); // every learnt case of the event
+    return ALG_EVENTS[st.event][group()];
+  };
   // Every case has a main alg and may have a secondary one (st.alt); useAlt lists the cases trained with the secondary.
   const mainAlg = c => st.edits[c.id] || c.alg;
   const options = c => [...new Set([...c.alts, mainAlg(c), st.alt[c.id]].filter(Boolean))]; // keeps algs typed in earlier
@@ -23,7 +29,7 @@ const Trainer = (() => {
   const bandOf = d => (d < 3.5 ? 'easy' : d < 5.5 ? 'medium' : 'hard');
   const sorted = () => st.order === 'easy' || st.order === 'hard';
   const byLevel = (a, b) => (st.order === 'hard' ? level(b) - level(a) : level(a) - level(b));
-  const groupOf = c => c.group || 'No group';
+  const groupOf = c => (group() === 'Learnt' ? c.set || 'Custom' : c.group || 'No group'); // the Learnt set is grouped by set
   const caseGroups = () => [...new Set(cases().map(groupOf))];
   const matches = (c, band, show, grp) => (grp === 'all' || groupOf(c) === grp) && (band === 'all' || bandOf(level(c)) === band) && (show === 'all' || isLearnt(c) === (show === 'learnt'));
   // Cases to train: in the chosen difficulty, easiest or hardest first when that order is chosen.
@@ -162,7 +168,7 @@ const Trainer = (() => {
     $('trlearn').textContent = cur && isLearnt(cur.c) ? 'Learnt ✓' : 'Mark learnt';
     $('trlearn').setAttribute('aria-pressed', !!(cur && isLearnt(cur.c)));
     if (!cur) {
-      $('trsetup').textContent = cases().length ? (visible().length ? 'Tick Train for at least one matching case below.' : 'No cases match the trainer’s filters.') : 'Add your own algs below to train them.';
+      $('trsetup').textContent = cases().length ? (visible().length ? 'Tick Train for at least one matching case below.' : 'No cases match the trainer’s filters.') : group() === 'Learnt' ? 'Mark cases as learnt and they will appear here.' : 'Add your own algs below to train them.';
       return;
     }
     $('trsetup').textContent = Cube.text(cur.moves) || '(already set up)';
@@ -262,7 +268,7 @@ const Trainer = (() => {
       if (st.alt[c.id]) menu.add(new Option(usesAlt(c) ? 'Train with main alg' : 'Train with secondary alg', 'swap'));
       if (st.edits[c.id]) menu.add(new Option('Restore original main alg', 'restore'));
       if (x.n) menu.add(new Option('Clear times', 'clear'));
-      if (group() === 'Custom') menu.add(new Option('Remove', 'remove'));
+      if (!c.kind) menu.add(new Option('Remove', 'remove'));
       menu.onchange = () => { const v = menu.value; menu.value = ''; menu.blur(); option(v, c); };
       cell(menu);
       return [...extra, tr];
@@ -272,6 +278,7 @@ const Trainer = (() => {
   function setLearnt(c, yes) {
     st.learnt = st.learnt.filter(i => i !== c.id);
     if (yes) st.learnt.push(c.id);
+    if (group() === 'Learnt') fillCaseGroups();
     selectionChanged();
     if (phase === 'idle') drawCase();
   }
@@ -304,7 +311,7 @@ const Trainer = (() => {
     const bad = check(t, c), badAlt = a ? (a === t ? 'Choose a different alg from the main one.' : check(a, c)) : useAlt ? 'Choose a secondary alg to train with it.' : '';
     if (bad) return 'Main alg: ' + bad;
     if (badAlt) return 'Secondary alg: ' + badAlt;
-    if (group() === 'Custom') c.alg = t;
+    if (!c.kind) c.alg = t;
     else if (t === c.alg) delete st.edits[c.id];
     else st.edits[c.id] = t;
     st.useAlt = st.useAlt.filter(i => i !== c.id);
@@ -452,11 +459,19 @@ const Trainer = (() => {
     let page = 'stats';
     try { page = localStorage.getItem('cubestats-page') === 'trainer' ? 'trainer' : 'stats'; } catch { /* default page */ }
     showPage(page);
-    try { const s = await getKV('trainer'); if (s) st = { ...st, ...s };
-      if (!ALG_EVENTS[st.event]) st.event = '3x3'; } catch { /* starts empty */ }
+    let saved = null;
+    try { saved = await getKV('trainer'); } catch { /* starts empty */ }
     ready = true;
+    load(saved);
+    Sync.loaded();
+  }
+  function load(saved) { // also used when syncing brings newer data
+    st = { ...structuredClone(DEFAULTS), ...saved };
+    if (!ALG_EVENTS[st.event]) st.event = '3x3';
+    last = null;
     refresh();
   }
-  return { init };
+  return { init, load, busy: () => phase !== 'idle' || !!editing };
 })();
 Trainer.init();
+Sync.init();

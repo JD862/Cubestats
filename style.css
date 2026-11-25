@@ -102,3 +102,10 @@ label.check{flex-direction:row;align-items:center;gap:8px;padding:8px 0;font-siz
 #trtable .trgroup th{padding-top:14px;font-size:15px;font-weight:600;color:var(--ink)}
 .trgroup span{font-size:13px;font-weight:400;color:var(--ink2);margin-left:6px}
 #trtable .trg{display:block;white-space:normal;min-width:62px;max-width:90px;font-size:13px}
+#syncbox{margin-top:auto;display:flex;flex-direction:column}
+#sidebar #signin{overflow:hidden;text-overflow:ellipsis;border-color:var(--line)}
+#syncstate{font-size:12px;color:var(--ink2);padding:4px 10px}
+.accbody,#accout,#accin,#accout form,#accin form{display:grid;gap:12px}
+.accbody [hidden]{display:none!important}
+.accbody h2,.accbody p{margin:0}
+@media(max-width:640px){#syncbox{margin:0 0 0 auto;flex-direction:row;align-items:center}#syncstate{white-space:nowrap}}

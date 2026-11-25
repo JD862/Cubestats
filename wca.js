@@ -204,7 +204,7 @@ const WCA = (() => {
     say(ok ? '' : SAVE_FAILED);
   }
   function init() {
-    $('wcaopen').onclick = () => { $('wcaid').value = data?.id || ''; $('wcaerr').textContent = ''; $('wcadlg').showModal(); $('wcaid').focus(); };
+    $('wcaopen').onclick = () => { $('wcaid').value = data?.id || Sync.wcaId(); $('wcaerr').textContent = ''; $('wcadlg').showModal(); $('wcaid').focus(); };
     $('wcacancel').onclick = () => $('wcadlg').close();
     $('wcaform').onsubmit = async e => {
       e.preventDefault();
@@ -216,6 +216,6 @@ const WCA = (() => {
       $('wcago').disabled = false;
     };
   }
-  return { build, use, init, addOptions, syncFilters, link, solvesFor, renderInto, compareChart, removeAll, isWca, firstEvent, eventName, allEvents: () => [...new Set([...Object.keys(EVENTS), ...eventIds()])], has: () => !!data, load: d => { data = d || null; },
+  return { build, use, init, addOptions, syncFilters, link, solvesFor, renderInto, compareChart, removeAll, isWca, firstEvent, hasEvent: v => !!eventOf(v), eventName, allEvents: () => [...new Set([...Object.keys(EVENTS), ...eventIds()])], has: () => !!data, load: d => { data = d || null; },
     roundOf: (s, v) => (s.src === 'wca' ? (isWca(v) ? eventOf(v) : data?.events[linked()?.wca])?.rounds[s.r] : null) };
 })();

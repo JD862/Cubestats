@@ -9,6 +9,7 @@
   <strong>Cubestats</strong>
   <button type="button" id="nav-stats">Statistics</button>
   <button type="button" id="nav-trainer">Alg trainer</button>
+  <div id="syncbox"><button type="button" id="signin">Sign in</button><span id="syncstate" role="status"></span></div>
 </nav>
 <div id="page-stats" class="page">
 <header><h1>Statistics</h1>
@@ -21,7 +22,7 @@
 </header>
 <p id="msg" role="status"></p>
 <section id="empty"><h2>Drop your solves here</h2>
-  <p>csTimer exports (.txt, .json or .csv), Excel workbooks, or plain lists of times. Any number of files, any size. Everything stays on this computer. You can also download your official results from the WCA.</p>
+  <p>csTimer exports (.txt, .json or .csv), Excel workbooks, or plain lists of times. Any number of files, any size. Your data stays in this browser unless you sign in to sync it. You can also download your official results from the WCA.</p>
 </section>
 <main id="main" hidden>
   <form id="filters">
@@ -97,9 +98,33 @@
   <p id="wcaerr" class="note" role="status"></p>
   <div class="actions"><button type="button" id="wcacancel">Cancel</button><button id="wcago" class="primary">Import results</button></div>
 </form></dialog>
+<dialog id="account" aria-labelledby="acctitle"><div class="accbody"><h2 id="acctitle">Account</h2>
+  <p id="accmsg" class="note" role="status"></p>
+  <div id="accout" hidden>
+    <button type="button" id="accwca" class="primary">Sign in with WCA</button>
+    <p id="accor" class="note">or use a username and password</p>
+    <form id="accform">
+      <label>Username<input id="accname" autocomplete="username" required minlength="3" maxlength="30" spellcheck="false"></label>
+      <label>Password (at least 10 characters)<input id="accpass" type="password" autocomplete="current-password" required minlength="10" maxlength="200"></label>
+      <div class="actions"><button value="login" class="primary">Sign in</button><button value="register">Create account</button></div>
+    </form>
+    <p class="note">There is no password reset. Connecting a WCA account gives you a second way in.</p>
+  </div>
+  <div id="accin" hidden>
+    <p id="accwho"></p>
+    <button type="button" id="accwcalink">Connect WCA account</button>
+    <form id="accchange"><h2 id="accsum"></h2>
+      <label>Username<input id="accnewname" autocomplete="username" required minlength="3" maxlength="30" spellcheck="false"></label>
+      <label id="acccurbox">Current password (also needed to delete)<input id="acccur" type="password" autocomplete="current-password" maxlength="200"></label>
+      <label>New password<input id="accnewpass" type="password" autocomplete="new-password" required minlength="10" maxlength="200"></label>
+      <div class="actions"><button>Save</button></div>
+    </form>
+    <div class="actions"><button type="button" id="accsignout">Sign out</button><button type="button" id="accdelete">Delete account</button></div>
+  </div>
+  <div class="actions"><button type="button" id="accclose">Close</button></div></div></dialog>
 <dialog id="ask" aria-labelledby="asktext"><p id="asktext"></p>
   <div class="actions"><button type="button" id="askno">Cancel</button><button type="button" id="askyes" class="primary"></button></div></dialog>
 <div id="tip" hidden></div>
-<script src="stats.js"></script><script src="import.js"></script><script src="wca.js"></script><script src="app.js"></script><script src="manager.js"></script><script src="cube.js"></script><script src="alts.js"></script><script src="algs.js"></script><script src="trainer.js"></script>
+<script src="stats.js"></script><script src="import.js"></script><script src="sync.js"></script><script src="wca.js"></script><script src="app.js"></script><script src="manager.js"></script><script src="cube.js"></script><script src="alts.js"></script><script src="algs.js"></script><script src="trainer.js"></script>
 </body>
 </html>

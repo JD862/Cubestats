@@ -16,9 +16,13 @@ const getKV = async k => {
   return new Promise((ok, no) => { const r = d.transaction('kv').objectStore('kv').get(k); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
 };
 const setKV = async (k, v) => {
-  const d = await db;
-  return new Promise((ok, no) => { const t = d.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => ok(); t.onerror = t.onabort = () => no(t.error); });
+  Sync.begin(k);
+  try {
+    const d = await db;
+    await new Promise((ok, no) => { const t = d.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => ok(); t.onerror = t.onabort = () => no(t.error); });
+  } finally { Sync.end(k); }
 };
+const newId = () => [...crypto.getRandomValues(new Uint8Array(12))].map(b => b.toString(16).padStart(2, '0')).join('');
 const say = m => { $('msg').textContent = m; };
 const save = () => setKV('sessions', sessions).then(() => true, () => false);
 const SAVE_FAILED = 'This browser could not save the data for next time.';
@@ -32,7 +36,7 @@ function addSessions(list) {
     if (!s.solves.length) continue;
     let name = s.name, i = 2;
     while (sessions.some(o => o.name === name)) name = `${s.name} (${i++})`;
-    sessions.push({ name, solves: s.solves });
+    sessions.push({ id: newId(), name, solves: s.solves });
     n += s.solves.length;
   }
   return n;
@@ -380,11 +384,12 @@ $('dlg').onclose = () => {
   importAll([{ name, read: async () => Import.fromText(text, name) }]);
 };
 // In-app replacement for confirm(), which some embedded browsers silently suppress.
-function ask(text, yes) {
+function ask(text, yes, no = 'Cancel') {
   return new Promise(done => {
     const d = $('ask');
     $('asktext').textContent = text;
     $('askyes').textContent = yes;
+    $('askno').textContent = no;
     d.returnValue = '';
     $('askyes').onclick = () => d.close('yes');
     $('askno').onclick = () => d.close('');
@@ -449,9 +454,11 @@ WCA.init();
   try {
     const s = await getKV('settings');
     if (s) for (const f of FIELDS) if (s[f] != null) $(f).value = s[f];
-    sessions = (await getKV('sessions')) || [];
+    sessions = ((await getKV('sessions')) || []).map(s => (s.id ? s : { ...s, id: newId() })); // ids let devices recognise the same session
     WCA.load(await getKV('wca'));
   } catch { say('This browser cannot save data between visits.'); }
   fillSizes();
   fillSessions(0);
+  if (sessions.length) await save(); // keeps newly given ids
+  Sync.loaded();
 })();

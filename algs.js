@@ -212,7 +212,7 @@ const ALG_EVENTS = (() => {
     return FACES[Math.floor((rest.charCodeAt(0) - 65) / 4)]; // blind letters go four to a face
   }
   for (const groups of [three, two, oh, blind]) for (const g in groups) {
-    for (const c of groups[g]) c.group = caseGroup(c);
+    for (const c of groups[g]) { c.group = caseGroup(c); c.set = g; }
     const order = [...new Set(g === 'OLL' ? Object.keys(OLL_GROUPS) : g === 'PLL' ? Object.keys(PLL_GROUPS) : groups[g].map(c => c.group))];
     groups[g].sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group)); // keeps the order inside a group
   }

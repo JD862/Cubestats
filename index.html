@@ -5,7 +5,13 @@
 <title>Cubestats</title><link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header><h1>Cubestats</h1>
+<nav id="sidebar" aria-label="Programs">
+  <strong>Cubestats</strong>
+  <button type="button" id="nav-stats">Statistics</button>
+  <button type="button" id="nav-trainer">Alg trainer</button>
+</nav>
+<div id="page-stats" class="page">
+<header><h1>Statistics</h1>
   <div class="actions">
     <button id="open" class="primary">Import files</button><button id="wcaopen">Import from WCA</button><button id="paste">Paste times</button>
     <button id="manage">Session manager</button>
@@ -40,6 +46,43 @@
   <section id="wca"></section>
   <section id="charts"></section>
 </main>
+</div>
+<div id="page-trainer" class="page" hidden>
+  <h1>Alg trainer</h1>
+  <div id="trbar">
+    <label>Event<select id="trevent"></select></label>
+    <label>Set<select id="trset"></select></label>
+    <label>Order<select id="trorder"><option value="random">Random</option><option value="weak">Weakest more often</option><option value="recap">Each case once</option><option value="easy">Easiest first</option><option value="hard">Hardest first</option></select></label>
+    <label>Difficulty<select id="trband"><option value="all">All</option><option value="easy">Easy (under 3.5)</option><option value="medium">Medium (3.5 to 5.4)</option><option value="hard">Hard (5.5 and up)</option></select></label>
+    <label>Case group<select id="trcasegroup"></select></label>
+    <label>Cases<select id="trlearnt"><option value="all">All</option><option value="new">Not learnt</option><option value="learnt">Learnt</option></select></label>
+    <label class="check"><input id="trpicture" type="checkbox">Show picture</label>
+  </div>
+  <section id="trmain" class="card">
+    <p id="trhold" class="note"></p>
+    <p id="trsetup" class="alg"></p>
+    <div id="trpic"></div>
+    <div id="trtime">0.00</div>
+    <p class="note">Hold and release space to start, press any key to stop. On a phone, tap the time.</p>
+    <p><b id="trname"></b> <span id="tralg" class="alg"></span></p>
+    <div class="actions center"><button type="button" id="trshow">Show alg</button><button type="button" id="trmiss">Missed it</button><button type="button" id="trskip">Skip</button><button type="button" id="trlearn">Mark learnt</button></div>
+    <div id="trlast" hidden><span id="trlasttext"></span> <button type="button" id="trundo">Remove</button></div>
+  </section>
+  <section class="card">
+    <div class="actions"><h2>Case list</h2><button type="button" id="trall">Select all</button><button type="button" id="trnone">Select none</button></div>
+    <div id="trlistbar">
+      <label>Difficulty<select id="trlistband"><option value="all">All</option><option value="easy">Easy (under 3.5)</option><option value="medium">Medium (3.5 to 5.4)</option><option value="hard">Hard (5.5 and up)</option></select></label>
+      <label>Case group<select id="trlistgroup"></select></label>
+    <label>Cases<select id="trlistshow"><option value="all">All</option><option value="new">Not learnt</option><option value="learnt">Learnt</option></select></label>
+      <label>Sort by<select id="trsort"><option value="set">Case group</option><option value="name">Case name (A to Z)</option><option value="nameDesc">Case name (Z to A)</option><option value="diff">Case difficulty (low to high)</option><option value="diffDesc">Case difficulty (high to low)</option></select></label>
+      <label class="check"><input id="trlistpic" type="checkbox">Show pictures</label>
+    </div>
+    <p id="trsum" class="note"></p>
+    <form id="trcustom" class="actions" hidden><input id="trnewname" placeholder="Name" aria-label="Name"><input id="trnewalg" placeholder="Algorithm, such as R U R' U'" aria-label="Algorithm"><input id="trnewgroup" placeholder="Case group (optional)" aria-label="Case group"><button class="primary">Add alg</button></form>
+    <p id="trmsg" class="note" role="status"></p>
+    <div class="scroll"><table id="trtable"></table></div>
+  </section>
+</div>
 <dialog id="dlg"><form method="dialog"><h2>Paste times</h2>
   <label>Session name<input id="pname" value="Pasted"></label>
   <label>Times<textarea id="ptext" rows="10" placeholder="12.34, 1:02.50, 11.08+, DNF"></textarea></label>
@@ -57,6 +100,6 @@
 <dialog id="ask" aria-labelledby="asktext"><p id="asktext"></p>
   <div class="actions"><button type="button" id="askno">Cancel</button><button type="button" id="askyes" class="primary"></button></div></dialog>
 <div id="tip" hidden></div>
-<script src="stats.js"></script><script src="import.js"></script><script src="wca.js"></script><script src="app.js"></script><script src="manager.js"></script>
+<script src="stats.js"></script><script src="import.js"></script><script src="wca.js"></script><script src="app.js"></script><script src="manager.js"></script><script src="cube.js"></script><script src="alts.js"></script><script src="algs.js"></script><script src="trainer.js"></script>
 </body>
 </html>

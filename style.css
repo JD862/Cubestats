@@ -40,14 +40,14 @@ dialog{background:var(--surface);color:var(--ink);border:1px solid var(--line);b
 dialog form{display:grid;gap:12px}
 dialog .actions{justify-content:flex-end}
 .field{display:flex;flex-direction:column;gap:3px;min-width:0;font-size:13px;color:var(--ink2)}
-#sizemenu{position:relative;font-size:15px;color:var(--ink)}
-#sizemenu summary{list-style:none;cursor:pointer;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 26px 7px 10px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-#sizemenu summary::-webkit-details-marker{display:none}
-#sizemenu summary::after{content:"";position:absolute;right:11px;top:13px;width:7px;height:7px;border:solid var(--ink2);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.dropdown{position:relative;font-size:15px;color:var(--ink)}
+.dropdown summary{list-style:none;cursor:pointer;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 26px 7px 10px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.dropdown summary::-webkit-details-marker{display:none}
+.dropdown summary::after{content:"";position:absolute;right:11px;top:13px;width:7px;height:7px;border:solid var(--ink2);border-width:0 2px 2px 0;transform:rotate(45deg)}
 .menu{position:absolute;z-index:8;top:calc(100% + 4px);left:0;width:210px;max-width:calc(100vw - 40px);background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 14px #0004;padding:6px}
-#sizelist{max-height:290px;overflow:auto}
-#sizelist label{flex-direction:row;align-items:center;gap:10px;padding:6px 8px;border-radius:5px;font-size:15px;color:var(--ink);cursor:pointer}
-#sizelist label:hover{background:var(--bg)}
+.droplist{max-height:290px;overflow:auto}
+.droplist label{flex-direction:row;align-items:center;gap:10px;padding:6px 8px;border-radius:5px;font-size:15px;color:var(--ink);cursor:pointer}
+.droplist label:hover{background:var(--bg)}
 .addrow{display:flex;gap:6px;border-top:1px solid var(--line);margin-top:6px;padding-top:8px}
 .addrow input{flex:1;min-width:0}
 #mgr{width:min(1100px,96vw);padding:0}
@@ -109,3 +109,15 @@ label.check{flex-direction:row;align-items:center;gap:8px;padding:8px 0;font-siz
 .accbody [hidden]{display:none!important}
 .accbody h2,.accbody p{margin:0}
 @media(max-width:640px){#syncbox{margin:0 0 0 auto;flex-direction:row;align-items:center}#syncstate{white-space:nowrap}}
+button.alg{background:none;border:0;padding:2px 0;text-align:left;border-radius:4px}
+button.alg:hover{text-decoration:underline}
+#tralg:empty{display:none}
+#algdlg{width:min(760px,94vw);padding:0}
+.algbody{padding:20px;text-align:center}
+.bigalg{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 18px;margin:14px 0;font:600 34px/1.2 ui-monospace,Consolas,monospace}
+#trtable tr.picked td{background:color-mix(in srgb,var(--s1) 26%,var(--surface))}
+#trbulk{position:sticky;bottom:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;padding:10px 12px;background:var(--bg);border:1px solid var(--ink2);border-radius:8px;z-index:6}
+#trbar .dropdown{width:170px}
+#algpickbox{text-align:left;margin-bottom:14px}
+#algpick{width:100%;font:15px ui-monospace,Consolas,monospace}
+.algbody .primary:disabled{opacity:.45}

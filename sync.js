@@ -55,8 +55,8 @@ const Merge = (() => {
   function trainer(b, l, r) {
     b = obj(b); l = obj(l); r = obj(r);
     const out = map(b, l, r);
-    for (const k of ['off', 'learnt', 'useAlt']) out[k] = [...new Set(list(b[k], l[k], r[k]))];
-    for (const k of ['edits', 'alt', 'groups']) out[k] = map(b[k], l[k], r[k]);
+    for (const k of ['learnt', 'learning', 'useAlt']) out[k] = [...new Set(list(b[k], l[k], r[k]))];
+    for (const k of ['edits', 'alt', 'groups', 'extra']) out[k] = map(b[k], l[k], r[k]);
     out.custom = Object.values(map(...[b, l, r].map(x => Object.fromEntries(arr(x.custom).map(c => [c.id, c])))));
     out.results = map(b.results, l.results, r.results, (x, y, z) => { const a = list(x, y, z); return a.length ? a.sort((p, q) => p.d - q.d) : undefined; });
     return out;

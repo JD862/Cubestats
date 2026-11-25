@@ -70,15 +70,52 @@ const Cube = (() => {
     }
     return out;
   }
-  // Difficulty from 1 to 10: how long an alg is and how awkward its moves are to turn.
+  // Difficulty from 1 to 10: how long an alg is, how awkward its moves are, and how much of it is easy sequences.
   const EFFORT = { R: 1, U: 1, r: 1.2, L: 1.3, l: 1.4, F: 1.4, D: 1.4, f: 1.6, u: 1.5, d: 1.5, B: 1.8, b: 1.8, M: 1.5, E: 2, S: 2, x: 1, y: 1, z: 1 };
   const OH_EFFORT = { ...EFFORT, L: 2, l: 2, F: 1.7, M: 3, S: 3, E: 3 }; // slices and left turns are hard with one hand
-  function difficulty(text, oneHanded) {
-    const table = oneHanded ? OH_EFFORT : EFFORT;
-    const moves = String(text).match(/[UDRLFBudrlfbMESxyz]w?[23]?/g) || [];
-    const effort = moves.reduce((a, m) => a + table[m[1] === 'w' ? m[0].toLowerCase() : m[0]] + (m.includes('2') ? 0.3 : 0), 0);
-    return Math.round(Math.min(10, Math.max(1, 1 + (effort - 6) * 0.5)) * 10) / 10;
+  const IN_GROUP = 0.65; // moves inside an easy sequence take this much of their usual effort
+  const known = new Map();
+  // Number of moves and total effort of an alg.
+  function measure(text, oneHanded) {
+    const id = (oneHanded ? 'OH ' : '') + text;
+    if (known.has(id)) return known.get(id);
+    const table = oneHanded ? OH_EFFORT : EFFORT, one = m => (table[m[1] === 'w' ? m[0].toLowerCase() : m[0]] || 1) + (m.includes('2') ? 0.3 : 0), groups = split(text);
+    const r = { moves: groups.flat().length, effort: groups.reduce((a, g) => a + g.reduce((x, m) => x + one(m), 0) * (g.length > 1 ? IN_GROUP : 1), 0) };
+    known.set(id, r);
+    return r;
   }
+  const tenth = (v, lo) => Math.round(Math.min(10, Math.max(lo, v)) * 10) / 10;
+  const difficulty = (text, oneHanded) => tenth(1 + (measure(text, oneHanded).effort - 2) * 0.5, 1);
+  // Efficiency from 1 to 10: half for how short an alg is next to the shortest one for its case, half for how easy each move is on average.
+  function efficiency(text, algs, oneHanded) {
+    const { moves, effort } = measure(text, oneHanded);
+    if (!moves) return 1;
+    const shortest = Math.min(moves, ...algs.map(a => measure(a, oneHanded).moves).filter(Boolean));
+    return tenth(5 * shortest / moves + 5 * Math.min(1, IN_GROUP * moves / effort), 1);
+  }
+  // Easy sequences that are turned as one, such as R U R' U'. X stands for each face in the list.
+  const TRIGGERS = new Map();
+  for (const [faces, shapes] of [
+    [['R', 'L', 'r', 'l'], ["X U X' U'", "X' U' X U", "X U' X' U", "X' U X U'", "X' F X F'", "X F' X' F", "F X' F' X", "F' X F X'"]],
+    [['R', 'L', 'r', 'l', 'F', 'f'], ["X U X'", "X U' X'", "X U2 X'", "X' U X", "X' U' X", "X' U2 X"]],
+    [[''], ["r U R' U'", "r' U' R U", "l' U' L U", "l U L' U'"]],
+  ]) for (const f of faces) for (const s of shapes) TRIGGERS.set(s.replaceAll('X', f), s.split(' ').length);
+  // Splits an alg into single moves and easy sequences, covering as many moves as possible with as few groups as possible.
+  function split(text) {
+    const m = String(text).match(/[UDRLFBudrlfbMESxyz]w?[23]?'?/g) || [], best = Array(m.length + 1).fill(null), out = [];
+    best[m.length] = { score: 0 };
+    for (let i = m.length - 1; i >= 0; i--) {
+      best[i] = { score: best[i + 1].score, n: 1 };
+      for (const n of [3, 4]) {
+        if (i + n > m.length || TRIGGERS.get(m.slice(i, i + n).join(' ')) !== n) continue;
+        const score = best[i + n].score + n * 10 - 5;
+        if (score >= best[i].score) best[i] = { score, n };
+      }
+    }
+    for (let i = 0; i < m.length; i += best[i].n) out.push(m.slice(i, i + best[i].n));
+    return out;
+  }
+  const grouped = text => split(text).map(g => (g.length > 1 ? `(${g.join(' ')})` : g[0])).join(' ');
   const invert = moves => moves.map(m => ({ f: m.f, n: 4 - m.n })).reverse();
   const turnY = (moves, k) => moves.map(m => { let f = m.f; for (let i = 0; i < k; i++) f = { F: 'R', R: 'B', B: 'L', L: 'F' }[f] || f; return { f, n: m.n }; });
   const text = moves => moves.map(m => m.f + ['', '', '2', "'"][m.n]).join(' ');
@@ -131,7 +168,7 @@ const Cube = (() => {
     }
     return cells;
   }
-  return { solved, apply, parse, simplify, invert, turnY, text, difficulty, keepsF2L, reached, maskedF2L, isoView, topView };
+  return { solved, apply, parse, simplify, invert, turnY, text, grouped, difficulty, efficiency, keepsF2L, reached, maskedF2L, isoView, topView };
 })();
 
 const ALG_SETS = (() => {

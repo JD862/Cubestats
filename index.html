@@ -33,8 +33,8 @@
     <label>From solve<input id="from" type="number" min="1"></label>
     <label>To solve<input id="to" type="number" min="1"></label>
     <div class="field"><span id="sizeslabel">Average sizes</span>
-      <details id="sizemenu"><summary id="sizesum" aria-labelledby="sizeslabel sizesum"></summary>
-        <div class="menu"><div id="sizelist" role="group" aria-labelledby="sizeslabel"></div>
+      <details id="sizemenu" class="dropdown"><summary id="sizesum" aria-labelledby="sizeslabel sizesum"></summary>
+        <div class="menu"><div id="sizelist" class="droplist" role="group" aria-labelledby="sizeslabel"></div>
           <div class="addrow"><input id="custom" type="number" min="2" step="1" placeholder="Other size" aria-label="Other average size"><button type="button" id="addsize">Add</button></div>
         </div></details>
       <input id="sizes" type="hidden"></div>
@@ -53,10 +53,13 @@
   <div id="trbar">
     <label>Event<select id="trevent"></select></label>
     <label>Set<select id="trset"></select></label>
+    <div class="field"><span id="trextralabel">Also train</span>
+      <details id="trextramenu" class="dropdown"><summary id="trextrasum" aria-labelledby="trextralabel trextrasum"></summary>
+        <div class="menu"><div id="trextralist" class="droplist" role="group" aria-labelledby="trextralabel"></div></div></details></div>
     <label>Order<select id="trorder"><option value="random">Random</option><option value="weak">Weakest more often</option><option value="recap">Each case once</option><option value="easy">Easiest first</option><option value="hard">Hardest first</option></select></label>
-    <label>Difficulty<select id="trband"><option value="all">All</option><option value="easy">Easy (under 3.5)</option><option value="medium">Medium (3.5 to 5.4)</option><option value="hard">Hard (5.5 and up)</option></select></label>
+    <label>Difficulty<select id="trband"><option value="all">All</option><option value="easy">Easy (under 4.5)</option><option value="medium">Medium (4.5 to 5.9)</option><option value="hard">Hard (6 and up)</option></select></label>
     <label>Case group<select id="trcasegroup"></select></label>
-    <label>Cases<select id="trlearnt"><option value="all">All</option><option value="new">Not learnt</option><option value="learnt">Learnt</option></select></label>
+    <label>Train on<select id="trpool"><option value="marked">Learning and learnt</option><option value="learning">Learning</option><option value="learnt">Learnt</option><option value="all">All cases</option></select></label>
     <label class="check"><input id="trpicture" type="checkbox">Show picture</label>
   </div>
   <section id="trmain" class="card">
@@ -65,23 +68,27 @@
     <div id="trpic"></div>
     <div id="trtime">0.00</div>
     <p class="note">Hold and release space to start, press any key to stop. On a phone, tap the time.</p>
-    <p><b id="trname"></b> <span id="tralg" class="alg"></span></p>
-    <div class="actions center"><button type="button" id="trshow">Show alg</button><button type="button" id="trmiss">Missed it</button><button type="button" id="trskip">Skip</button><button type="button" id="trlearn">Mark learnt</button></div>
+    <p><b id="trname"></b> <button type="button" id="tralg" class="alg" title="Open larger"></button></p>
+    <div class="actions center"><button type="button" id="trshow">Show alg</button><button type="button" id="trmiss">Missed it</button><button type="button" id="trskip">Skip</button><button type="button" id="trlearning">Mark learning</button><button type="button" id="trlearn">Mark learnt</button></div>
     <div id="trlast" hidden><span id="trlasttext"></span> <button type="button" id="trundo">Remove</button></div>
   </section>
   <section class="card">
-    <div class="actions"><h2>Case list</h2><button type="button" id="trall">Select all</button><button type="button" id="trnone">Select none</button></div>
+    <div class="actions"><h2>Case list</h2><button type="button" id="trall">Select all</button></div>
     <div id="trlistbar">
-      <label>Difficulty<select id="trlistband"><option value="all">All</option><option value="easy">Easy (under 3.5)</option><option value="medium">Medium (3.5 to 5.4)</option><option value="hard">Hard (5.5 and up)</option></select></label>
+      <label>Difficulty<select id="trlistband"><option value="all">All</option><option value="easy">Easy (under 4.5)</option><option value="medium">Medium (4.5 to 5.9)</option><option value="hard">Hard (6 and up)</option></select></label>
       <label>Case group<select id="trlistgroup"></select></label>
-    <label>Cases<select id="trlistshow"><option value="all">All</option><option value="new">Not learnt</option><option value="learnt">Learnt</option></select></label>
-      <label>Sort by<select id="trsort"><option value="set">Case group</option><option value="name">Case name (A to Z)</option><option value="nameDesc">Case name (Z to A)</option><option value="diff">Case difficulty (low to high)</option><option value="diffDesc">Case difficulty (high to low)</option></select></label>
+    <label>Cases<select id="trlistshow"><option value="all">All</option><option value="new">Not learnt</option><option value="learning">Learning</option><option value="learnt">Learnt</option></select></label>
+      <label>Sort by<select id="trsort"><option value="set">Case group</option><option value="name">Case name (A to Z)</option><option value="nameDesc">Case name (Z to A)</option><option value="diff">Case difficulty (low to high)</option><option value="diffDesc">Case difficulty (high to low)</option><option value="eff">Alg efficiency (low to high)</option><option value="effDesc">Alg efficiency (high to low)</option></select></label>
       <label class="check"><input id="trlistpic" type="checkbox">Show pictures</label>
     </div>
     <p id="trsum" class="note"></p>
     <form id="trcustom" class="actions" hidden><input id="trnewname" placeholder="Name" aria-label="Name"><input id="trnewalg" placeholder="Algorithm, such as R U R' U'" aria-label="Algorithm"><input id="trnewgroup" placeholder="Case group (optional)" aria-label="Case group"><button class="primary">Add alg</button></form>
     <p id="trmsg" class="note" role="status"></p>
+    <p class="note">Ctrl+click (Cmd+click on a Mac) rows to select several cases, or Shift+click for a range.</p>
     <div class="scroll"><table id="trtable"></table></div>
+    <div id="trbulk" role="toolbar" aria-label="Selected cases" hidden><b id="trbulkn" role="status"></b>
+      <button type="button" value="learning">Learning</button><button type="button" value="learnt">Learnt</button><button type="button" value="none">Not learnt</button>
+      <button type="button" id="trbulkclear">Deselect</button></div>
   </section>
 </div>
 <dialog id="dlg"><form method="dialog"><h2>Paste times</h2>
@@ -122,6 +129,10 @@
     <div class="actions"><button type="button" id="accsignout">Sign out</button><button type="button" id="accdelete">Delete account</button></div>
   </div>
   <div class="actions"><button type="button" id="accclose">Close</button></div></div></dialog>
+<dialog id="algdlg" aria-labelledby="algname"><div class="algbody"><h2 id="algname"></h2>
+  <div id="algpic"></div><div id="algtext"></div><p id="algnote" class="note"></p>
+  <label id="algpickbox">Alg<select id="algpick"></select></label>
+  <div class="actions center"><button type="button" id="alguse" class="primary">Train with this alg</button><button type="button" id="algalt">Set as secondary</button><button type="button" id="algclose">Close</button></div></div></dialog>
 <dialog id="ask" aria-labelledby="asktext"><p id="asktext"></p>
   <div class="actions"><button type="button" id="askno">Cancel</button><button type="button" id="askyes" class="primary"></button></div></dialog>
 <div id="tip" hidden></div>

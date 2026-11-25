@@ -3,11 +3,12 @@
 const Trainer = (() => {
   const COLORS = { U: '#f2d21b', D: '#f4f4f0', F: '#1f9d4d', B: '#2a62d6', R: '#f07c1a', L: '#d0312d' };
   const GREY = '#77777a', LAST_LAYER = ['oll', 'eoll', 'cpll', 'pll', 'ort', 'cll', 'pbl'], TWO = ['ort', 'cll', 'pbl'];
-  // results: { caseId: [{ t, d }] } with t in ms, or null for a miss. off: case ids left out of training.
+  // results: { caseId: [{ t, d }] } with t in ms, or null for a miss. pool: which marks are trained.
   // groups: the group last used in each event.
-  const DEFAULTS = { event: '3x3', groups: { '3x3': 'PLL' }, order: 'random', band: 'all', sort: 'set', learnt: [], show: 'all', picture: true, listBand: 'all', listShow: 'all', caseGroup: 'all', listGroup: 'all', listPicture: true, off: [], results: {}, edits: {}, alt: {}, useAlt: [], custom: [] };
+  const DEFAULTS = { event: '3x3', groups: { '3x3': 'PLL' }, order: 'random', band: 'all', sort: 'set', learnt: [], learning: [], pool: 'marked', extra: {}, picture: true, listBand: 'all', listShow: 'all', caseGroup: 'all', listGroup: 'all', listPicture: true, results: {}, edits: {}, alt: {}, useAlt: [], custom: [] };
   let st = structuredClone(DEFAULTS);
   let cur = null, queue = [], phase = 'idle', started = 0, frame = 0, last = null, editing = null, ready = false;
+  let picked = new Set(), anchor = null; // cases selected with Ctrl+click, and where a Shift+click range starts
 
   const store = () => ready && setKV('trainer', st).catch(() => { $('trmsg').textContent = SAVE_FAILED; });
   const groupNames = () => [...Object.keys(ALG_EVENTS[st.event]), 'Custom', 'Learnt'];
@@ -20,21 +21,31 @@ const Trainer = (() => {
   };
   // Every case has a main alg and may have a secondary one (st.alt); useAlt lists the cases trained with the secondary.
   const mainAlg = c => st.edits[c.id] || c.alg;
-  const options = c => [...new Set([...c.alts, mainAlg(c), st.alt[c.id]].filter(Boolean))]; // keeps algs typed in earlier
+  const options = c => [...new Set([...(c.alts || []), mainAlg(c), st.alt[c.id]].filter(Boolean))]; // keeps algs typed in earlier
   const usesAlt = c => !!st.alt[c.id] && st.useAlt.includes(c.id);
   const algOf = c => (usesAlt(c) ? st.alt[c.id] : mainAlg(c));
   const isLearnt = c => st.learnt.includes(c.id);
+  const isLearning = c => st.learning.includes(c.id) && !isLearnt(c);
+  const hasStatus = (c, show) => (show === 'learnt' ? isLearnt(c) : show === 'learning' ? isLearning(c) : show === 'new' ? !isLearnt(c) : show === 'marked' ? isLearnt(c) || isLearning(c) : true);
   const resultsOf = c => st.results[c.id] || [];
   const level = c => Cube.difficulty(algOf(c), st.event === 'OH');
-  const bandOf = d => (d < 3.5 ? 'easy' : d < 5.5 ? 'medium' : 'hard');
+  const effOf = (c, a = algOf(c)) => Cube.efficiency(a, options(c), st.event === 'OH');
+  const scores = (c, a) => `difficulty ${Cube.difficulty(a, st.event === 'OH').toFixed(1)}, efficiency ${effOf(c, a).toFixed(1)}`;
+  const bandOf = d => (d < 4.5 ? 'easy' : d < 6 ? 'medium' : 'hard');
   const sorted = () => st.order === 'easy' || st.order === 'hard';
   const byLevel = (a, b) => (st.order === 'hard' ? level(b) - level(a) : level(a) - level(b));
+  // Other sets of the event that are trained along with the chosen one.
+  const extraSets = () => (st.extra[st.event] || []).filter(g => g !== group() && g !== 'Learnt' && groupNames().includes(g));
+  const extraCases = () => {
+    const own = new Set(cases().map(c => c.id));
+    return extraSets().flatMap(g => (g === 'Custom' ? customCases() : ALG_EVENTS[st.event][g])).filter(c => !own.has(c.id));
+  };
   const groupOf = c => (group() === 'Learnt' ? c.set || 'Custom' : c.group || 'No group'); // the Learnt set is grouped by set
   const caseGroups = () => [...new Set(cases().map(groupOf))];
-  const matches = (c, band, show, grp) => (grp === 'all' || groupOf(c) === grp) && (band === 'all' || bandOf(level(c)) === band) && (show === 'all' || isLearnt(c) === (show === 'learnt'));
+  const matches = (c, band, show, grp) => (grp === 'all' || groupOf(c) === grp) && (band === 'all' || bandOf(level(c)) === band) && hasStatus(c, show);
   // Cases to train: in the chosen difficulty, easiest or hardest first when that order is chosen.
   const visible = () => {
-    const list = cases().filter(c => matches(c, st.band, st.show, st.caseGroup));
+    const list = [...cases().filter(c => matches(c, st.band, st.pool, st.caseGroup)), ...extraCases().filter(c => matches(c, st.band, st.pool, 'all'))];
     return sorted() ? list.sort(byLevel) : list;
   };
   // The case list has its own filters and order; they never change what is trained.
@@ -42,12 +53,12 @@ const Trainer = (() => {
   const SORTS = {
     name: byName, nameDesc: (a, b) => byName(b, a),
     diff: (a, b) => level(a) - level(b) || byName(a, b), diffDesc: (a, b) => level(b) - level(a) || byName(a, b),
+    eff: (a, b) => effOf(a) - effOf(b) || byName(a, b), effDesc: (a, b) => effOf(b) - effOf(a) || byName(a, b),
   };
   const listed = () => {
     const list = cases().filter(c => matches(c, st.listBand, st.listShow, st.listGroup)), order = caseGroups();
     return list.sort(SORTS[st.sort] || ((a, b) => order.indexOf(groupOf(a)) - order.indexOf(groupOf(b))));
   };
-  const active = () => visible().filter(c => !st.off.includes(c.id));
   function stats(c) {
     const r = resultsOf(c), t = r.filter(x => x.t != null).map(x => x.t), s = Stats.summary(t);
     return { n: r.length, miss: r.length - t.length, avg: s.average };
@@ -84,7 +95,7 @@ const Trainer = (() => {
 
   /* ---------- choosing cases ---------- */
   function pick() {
-    const list = active();
+    const list = visible();
     if (!list.length) return null;
     if (st.order === 'recap' || sorted()) { // every selected case once, shuffled or by difficulty, then again
       queue = queue.filter(id => list.some(c => c.id === id));
@@ -152,69 +163,112 @@ const Trainer = (() => {
   function record(t) {
     const c = cur.c, id = c.id;
     (st.results[id] ||= []).push({ t, d: Date.now() });
-    last = { id, name: c.name, alg: algOf(c), t };
+    last = { id, name: c.name, alg: algOf(c), t, before: isLearnt(c) ? 'learnt' : isLearning(c) ? 'learning' : '' };
+    if (t != null) putStatus(id, 'learnt'); // a timed solve counts as learnt; a miss changes nothing
     store();
     next();
     drawLast();
     drawList();
   }
 
+  const NO_POOL = { marked: 'Tick Learning or Learnt for the cases you want to train.', learning: 'Tick Learning for the cases you want to train.', learnt: 'Tick Learnt for the cases you want to train.' };
+
   /* ---------- drawing ---------- */
+  const label = c => (extraSets().length && (c.set || 'Custom') !== group() ? `${c.set || 'Custom'} – ${c.name}` : c.name); // says which other set a case is from
   function drawCase() {
     $('trpic').replaceChildren();
     $('trname').textContent = '';
     $('tralg').textContent = '';
-    for (const b of ['trshow', 'trskip', 'trmiss', 'trlearn']) $(b).disabled = !cur;
-    $('trlearn').textContent = cur && isLearnt(cur.c) ? 'Learnt ✓' : 'Mark learnt';
-    $('trlearn').setAttribute('aria-pressed', !!(cur && isLearnt(cur.c)));
+    for (const b of ['trshow', 'trskip', 'trmiss', 'trlearn', 'trlearning']) $(b).disabled = !cur;
+    for (const [id, has, on, off] of [['trlearn', isLearnt, 'Learnt ✓', 'Mark learnt'], ['trlearning', isLearning, 'Learning ✓', 'Mark learning']]) {
+      const yes = !!cur && has(cur.c);
+      $(id).textContent = yes ? on : off;
+      $(id).setAttribute('aria-pressed', yes);
+    }
     if (!cur) {
-      $('trsetup').textContent = cases().length ? (visible().length ? 'Tick Train for at least one matching case below.' : 'No cases match the trainer’s filters.') : group() === 'Learnt' ? 'Mark cases as learnt and they will appear here.' : 'Add your own algs below to train them.';
+      $('trsetup').textContent = (cases().length || extraCases().length) ? ([...cases(), ...extraCases()].some(c => hasStatus(c, st.pool)) ? 'No cases match the trainer’s filters.' : NO_POOL[st.pool]) : group() === 'Learnt' ? 'Mark cases as learnt and they will appear here.' : 'Add your own algs below to train them.';
       return;
     }
     $('trsetup').textContent = Cube.text(cur.moves) || '(already set up)';
     if (st.picture && view(cur.c, cur.state)) $('trpic').append(picture(cur.c, cur.state, 150));
-    if (cur.c.kind === 'blind') $('trname').textContent = cur.c.name; // the letter is the prompt
+    if (cur.c.kind === 'blind') $('trname').textContent = label(cur.c); // the letter is the prompt
     $('trshow').textContent = cur.shown ? 'Hide alg' : 'Show alg';
-    if (cur.shown) { $('trname').textContent = cur.c.name; $('tralg').textContent = algOf(cur.c); }
+    if (cur.shown) { $('trname').textContent = label(cur.c); $('tralg').textContent = Cube.grouped(algOf(cur.c)); }
+  }
+  // An alg that opens large when clicked.
+  function algButton(c, alg) {
+    const b = el('button', Cube.grouped(alg), 'alg');
+    b.type = 'button';
+    b.setAttribute('aria-label', `${c.name}: ${alg}. Open larger`);
+    b.onclick = () => openAlg(c, alg);
+    return b;
+  }
+  // Pop-up with one alg in large type; any other alg of the case can be viewed and chosen there.
+  function openAlg(c, alg) {
+    if (phase === 'running') return;
+    const sel = $('algpick');
+    sel.replaceChildren(...options(c).map(a => new Option(`${Cube.grouped(a)}  – ${scores(c, a)}`, a)));
+    sel.value = alg;
+    const show = () => {
+      const a = sel.value, state = setupState(c, Cube.invert(Cube.parse(a))), main = mainAlg(c), alt = st.alt[c.id], p = el('p', null, 'bigalg');
+      p.append(...(Cube.grouped(a).match(/\([^)]*\)|\S+/g) || []).map(m => el('span', m)));
+      $('algname').textContent = c.name;
+      $('algpic').replaceChildren(...(view(c, state) ? [picture(c, state, 170)] : []));
+      $('algtext').replaceChildren(p);
+      const role = a === main ? 'Main alg' : a === alt ? 'Secondary alg' : 'Not chosen';
+      $('algnote').textContent = `${groupOf(c)}. D${scores(c, a).slice(1)}. ${role}${a === algOf(c) ? ', training with this' : ''}.`;
+      $('alguse').disabled = a === algOf(c);
+      $('algalt').disabled = a === main || a === alt;
+    };
+    const choose = (...args) => { setAlgs(c, ...args); show(); };
+    sel.onchange = show;
+    $('alguse').onclick = () => { // the secondary alg stays secondary; any other one becomes the main alg
+      const a = sel.value, alt = st.alt[c.id] || '';
+      if (a === alt && a !== mainAlg(c)) choose(mainAlg(c), alt, true); else choose(a, alt === a ? '' : alt, false);
+    };
+    $('algalt').onclick = () => choose(mainAlg(c), sel.value, usesAlt(c));
+    $('algpickbox').hidden = sel.options.length < 2;
+    $('alguse').hidden = $('algalt').hidden = sel.options.length < 2;
+    show();
+    $('algdlg').showModal();
   }
   function drawLast() {
     $('trlast').hidden = !last;
     if (!last) return;
-    $('trlasttext').replaceChildren(el('b', last.t == null ? 'Missed' : format(last.t)), ` ${last.name}: ${last.alg}`);
+    $('trlasttext').replaceChildren(el('b', last.t == null ? 'Missed' : format(last.t)), ` ${last.name}: ${Cube.grouped(last.alg)}`);
   }
   function drawList() {
-    const all = listed(), on = active(), done = all.flatMap(c => resultsOf(c)), times = done.filter(x => x.t != null).map(x => x.t), s = Stats.summary(times);
+    const all = listed(), on = visible(), done = all.flatMap(c => resultsOf(c)), times = done.filter(x => x.t != null).map(x => x.t), s = Stats.summary(times);
     const set = cases();
-    $('trsum').textContent = `${set.filter(isLearnt).length} of ${set.length} learnt. Training ${on.length}, showing ${all.length}. ${done.length.toLocaleString()} attempts, average ${format(s.average)}, ${(done.length - times.length).toLocaleString()} missed.`;
+    $('trsum').textContent = `${set.filter(isLearnt).length} of ${set.length} learnt, ${set.filter(isLearning).length} learning. Training ${on.length}, showing ${all.length}. ${done.length.toLocaleString()} attempts, average ${format(s.average)}, ${(done.length - times.length).toLocaleString()} missed.`;
+    picked = new Set(all.filter(c => picked.has(c.id)).map(c => c.id)); // only listed cases can stay selected
     const head = el('tr');
-    for (const h of ['Train', 'Learnt', 'Case', 'Group', 'Algorithm', 'Diff.', 'Tries', 'Avg', '']) head.append(el('th', h));
+    for (const h of ['Learnt', 'Learning', 'Case', 'Group', 'Algorithm', 'Diff.', 'Eff.', 'Tries', 'Avg', '']) head.append(el('th', h));
     let heading = null;
     $('trtable').replaceChildren(head, ...all.flatMap(c => {
       const extra = [];
       if (!SORTS[st.sort] && heading !== groupOf(c)) { // a heading above each case group in the default order
         heading = groupOf(c);
         const members = set.filter(x => groupOf(x) === heading), h = el('tr', null, 'trgroup'), th = el('th', `${heading} `);
-        th.colSpan = 9;
+        th.colSpan = 10;
         th.append(el('span', `${members.filter(isLearnt).length} of ${members.length} learnt`));
         h.append(th);
         extra.push(h);
       }
-      const tr = el('tr'), cell = (...x) => { const td = el('td'); td.append(...x); tr.append(td); }, x = stats(c), box = el('input');
-      box.type = 'checkbox';
-      box.checked = !st.off.includes(c.id);
-      box.setAttribute('aria-label', `Train ${c.name}`);
-      box.onchange = () => {
-        st.off = box.checked ? st.off.filter(i => i !== c.id) : [...st.off, c.id];
-        box.blur();
-        selectionChanged();
-      };
-      cell(box);
+      const tr = el('tr'), cell = (...x) => { const td = el('td'); td.append(...x); tr.append(td); }, x = stats(c);
+      tr.dataset.id = c.id;
       const mark = el('input');
       mark.type = 'checkbox';
       mark.checked = isLearnt(c);
       mark.setAttribute('aria-label', `${c.name} learnt`);
-      mark.onchange = () => { mark.blur(); setLearnt(c, mark.checked); };
+      mark.onchange = () => { mark.blur(); setStatus(c, mark.checked ? 'learnt' : ''); };
       cell(mark);
+      const prog = el('input');
+      prog.type = 'checkbox';
+      prog.checked = isLearning(c);
+      prog.setAttribute('aria-label', `Learning ${c.name}`);
+      prog.onchange = () => { prog.blur(); setStatus(c, prog.checked ? 'learning' : ''); };
+      cell(prog);
       const wrap = el('div', null, 'trcase'), state = setupState(c);
       if (st.listPicture && view(c, state)) wrap.append(picture(c, state, 36));
       wrap.append(c.name);
@@ -229,7 +283,7 @@ const Trainer = (() => {
           if (!c.kind) return el('input', null, 'tredit');
           const sel = el('select', null, 'tredit');
           if (none) sel.add(new Option('None', ''));
-          for (const a of options(c)) sel.add(new Option(`${a}  (${Cube.difficulty(a, st.event === 'OH').toFixed(1)})`, a));
+          for (const a of options(c)) sel.add(new Option(`${Cube.grouped(a)}  – ${scores(c, a)}`, a));
           return sel;
         };
         const main = field('Main alg', pickAlg(false)), alt = field('Secondary alg (optional)', pickAlg(true)), use = field('Train with', el('select', null, 'truse'));
@@ -249,17 +303,25 @@ const Trainer = (() => {
         box.append(err, bar);
         cell(box);
       } else {
-        const lines = [el('span', mainAlg(c), 'alg')];
+        const lines = [algButton(c, mainAlg(c))];
         if (st.alt[c.id]) {
-          lines.push(el('span', st.alt[c.id], 'alg'));
+          lines.push(algButton(c, st.alt[c.id]));
           lines[usesAlt(c) ? 0 : 1].classList.add('unused');
-          lines[0].title = `Main alg${usesAlt(c) ? '' : ' (training with this)'}`;
-          lines[1].title = `Secondary alg${usesAlt(c) ? ' (training with this)' : ''}`;
+          lines.forEach((b, i) => { // right-click the alg that is not in use to train with it
+            const inUse = usesAlt(c) === (i === 1);
+            b.title = `${i ? 'Secondary' : 'Main'} alg (${inUse ? 'training with this' : 'right-click to train with this'})`;
+            b.oncontextmenu = e => {
+              if (e.ctrlKey || e.metaKey) return;
+              e.preventDefault();
+              if (!inUse && phase === 'idle') option('swap', c);
+            };
+          });
         }
         cell(...lines);
       }
       const d = level(c);
       cell(d.toFixed(1));
+      cell(effOf(c).toFixed(1));
       cell(String(x.n));
       cell(format(x.avg));
       const menu = el('select');
@@ -273,18 +335,56 @@ const Trainer = (() => {
       cell(menu);
       return [...extra, tr];
     }));
+    drawPicked();
     if (editing) $('trtable').querySelector('.tredit')?.focus();
   }
-  function setLearnt(c, yes) {
-    st.learnt = st.learnt.filter(i => i !== c.id);
-    if (yes) st.learnt.push(c.id);
+  /* ---------- several cases at once ---------- */
+  function drawPicked() {
+    for (const tr of $('trtable').rows) if (tr.dataset.id) { const on = picked.has(tr.dataset.id); tr.classList.toggle('picked', on); tr.setAttribute('aria-selected', on); }
+    $('trbulk').hidden = !picked.size;
+    $('trbulkn').textContent = `${picked.size} selected`;
+  }
+  function pickRow(e) {
+    const id = e.target.closest('tr')?.dataset.id;
+    if (!id || !(e.ctrlKey || e.metaKey || e.shiftKey) || e.target.closest('.treditor')) return;
+    e.preventDefault(); // the click selects the row instead of using the checkbox, alg or menu under it
+    e.stopPropagation();
+    if (e.type !== 'click') return;
+    if (e.shiftKey) {
+      const ids = listed().map(c => c.id), a = ids.indexOf(picked.size && ids.includes(anchor) ? anchor : id), b = ids.indexOf(id);
+      for (const x of ids.slice(Math.min(a, b), Math.max(a, b) + 1)) picked.add(x);
+    } else {
+      if (picked.has(id)) picked.delete(id); else picked.add(id);
+      anchor = id;
+    }
+    drawPicked();
+  }
+  function bulk(op) {
+    const ids = [...picked], not = list => list.filter(i => !picked.has(i));
+    st.learning = not(st.learning);
+    st.learnt = not(st.learnt);
+    if (op !== 'none') st[op].push(...ids);
     if (group() === 'Learnt') fillCaseGroups();
+    selectionChanged();
+    if (phase === 'idle') drawCase();
+  }
+  function clearPicked() { picked.clear(); anchor = null; drawPicked(); }
+
+  function putStatus(id, status) { // 'learning', 'learnt' or '' for neither
+    for (const k of ['learning', 'learnt']) {
+      st[k] = st[k].filter(i => i !== id);
+      if (k === status) st[k].push(id);
+    }
+    if (group() === 'Learnt') fillCaseGroups();
+  }
+  function setStatus(c, status) {
+    putStatus(c.id, status);
     selectionChanged();
     if (phase === 'idle') drawCase();
   }
   function selectionChanged() {
     queue = [];
-    if (phase === 'idle' && !(cur && active().some(c => c.id === cur.c.id))) next();
+    if (phase === 'idle' && !(cur && visible().some(c => c.id === cur.c.id))) next();
     store();
     drawList();
   }
@@ -334,8 +434,8 @@ const Trainer = (() => {
     if (op === 'remove') {
       if (!(await ask(`Remove ${c.name} and its times? This cannot be undone.`, 'Remove'))) return;
       st.custom = st.custom.filter(x => x.id !== c.id);
-      st.off = st.off.filter(i => i !== c.id);
       st.learnt = st.learnt.filter(i => i !== c.id);
+      st.learning = st.learning.filter(i => i !== c.id);
       st.useAlt = st.useAlt.filter(i => i !== c.id);
       delete st.alt[c.id];
       fillCaseGroups();
@@ -356,12 +456,26 @@ const Trainer = (() => {
       $(id).value = st[k];
     }
   }
+  function fillExtra() {
+    const on = extraSets();
+    $('trextralist').replaceChildren(...groupNames().filter(g => g !== group() && g !== 'Learnt').map(g => {
+      const l = el('label'), b = el('input');
+      b.type = 'checkbox';
+      b.value = g;
+      b.checked = on.includes(g);
+      l.append(b, g);
+      return l;
+    }));
+    $('trextrasum').textContent = on.length ? on.join(', ') : 'None';
+  }
   function refresh() {
     $('trmsg').textContent = '';
     cancel();
     queue = [];
     cur = null;
     editing = null;
+    picked.clear();
+    anchor = null;
     $('trevent').value = st.event;
     $('trset').replaceChildren(...groupNames().map(g => new Option(g, g)));
     $('trset').value = group();
@@ -371,12 +485,13 @@ const Trainer = (() => {
     $('trorder').value = st.order;
     $('trband').value = st.band;
     $('trsort').value = st.sort;
-    $('trlearnt').value = st.show;
+    $('trpool').value = st.pool;
     $('trlistband').value = st.listBand;
     $('trlistshow').value = st.listShow;
     $('trlistpic').checked = st.listPicture;
     $('trpicture').checked = st.picture;
     fillCaseGroups();
+    fillExtra();
     $('trcustom').hidden = group() !== 'Custom';
     next();
     drawLast();
@@ -403,25 +518,39 @@ const Trainer = (() => {
     $('trset').onchange = () => { st.groups = { ...st.groups, [st.event]: $('trset').value }; $('trset').blur(); refresh(); store(); };
     $('trorder').onchange = () => { st.order = $('trorder').value; $('trorder').blur(); queue = []; if (phase === 'idle') next(); store(); drawList(); };
     $('trband').onchange = () => { st.band = $('trband').value; $('trband').blur(); selectionChanged(); };
+    $('trextralist').onchange = () => {
+      st.extra = { ...st.extra, [st.event]: [...[...$('trextralist').querySelectorAll(':checked')].map(b => b.value), ...(st.extra[st.event] || []).filter(g => g === group())] };
+      $('trextrasum').textContent = extraSets().join(', ') || 'None';
+      selectionChanged();
+    };
+    addEventListener('pointerdown', e => { if (!$('trextramenu').contains(e.target)) $('trextramenu').open = false; });
+    $('trextramenu').onkeydown = e => { if (e.key === 'Escape') { $('trextramenu').open = false; $('trextrasum').focus(); } };
     $('trcasegroup').onchange = () => { st.caseGroup = $('trcasegroup').value; $('trcasegroup').blur(); selectionChanged(); };
-    $('trlearnt').onchange = () => { st.show = $('trlearnt').value; $('trlearnt').blur(); selectionChanged(); };
-    $('trlearn').onclick = () => setLearnt(cur.c, !isLearnt(cur.c));
+    $('trpool').onchange = () => { st.pool = $('trpool').value; $('trpool').blur(); selectionChanged(); };
+    $('trlearning').onclick = () => setStatus(cur.c, isLearning(cur.c) ? '' : 'learning');
+    $('trlearn').onclick = () => setStatus(cur.c, isLearnt(cur.c) ? '' : 'learnt');
     for (const [id, k] of [['trlistband', 'listBand'], ['trlistshow', 'listShow'], ['trlistgroup', 'listGroup']]) $(id).onchange = () => { st[k] = $(id).value; $(id).blur(); store(); drawList(); };
     $('trlistpic').onchange = () => { st.listPicture = $('trlistpic').checked; $('trlistpic').blur(); store(); drawList(); };
     $('trsort').onchange = () => { st.sort = $('trsort').value; $('trsort').blur(); store(); drawList(); };
     $('trpicture').onchange = () => { st.picture = $('trpicture').checked; $('trpicture').blur(); drawCase(); store(); };
-    $('trall').onclick = () => { const ids = listed().map(c => c.id); st.off = st.off.filter(i => !ids.includes(i)); selectionChanged(); };
-    $('trnone').onclick = () => { st.off = [...new Set([...st.off, ...listed().map(c => c.id)])]; selectionChanged(); };
+    $('trall').onclick = () => { picked = new Set(listed().map(c => c.id)); drawPicked(); };
     $('trshow').onclick = () => { cur.shown = !cur.shown; drawCase(); };
+    for (const t of ['mousedown', 'click']) $('trtable').addEventListener(t, pickRow, true);
+    for (const b of $('trbulk').querySelectorAll('button[value]')) b.onclick = () => bulk(b.value);
+    $('trbulkclear').onclick = clearPicked;
+    $('tralg').onclick = () => openAlg(cur.c, algOf(cur.c));
+    $('algclose').onclick = () => $('algdlg').close();
+    $('algdlg').onclick = e => { if (e.target === $('algdlg')) $('algdlg').close(); };
     $('trskip').onclick = () => { cancel(); next(); };
     $('trmiss').onclick = () => { cancel(); record(null); };
     $('trundo').onclick = () => { // removes the last attempt
       st.results[last.id]?.pop();
       if (!st.results[last.id]?.length) delete st.results[last.id];
+      if (last.t != null && st.learnt.includes(last.id)) putStatus(last.id, last.before); // back to the mark it had
       last = null;
-      store();
       drawLast();
-      drawList();
+      selectionChanged();
+      if (phase === 'idle') drawCase();
     };
     $('trcustom').onsubmit = e => {
       e.preventDefault();
@@ -440,6 +569,7 @@ const Trainer = (() => {
     addEventListener('keydown', e => {
       if (!ready || !onTrainer() || document.querySelector('dialog[open]')) return;
       if (phase === 'running') { e.preventDefault(); if (!e.repeat) { if (e.key === 'Escape') cancel(); else press(); } return; }
+      if (e.key === 'Escape' && picked.size && !editing) return clearPicked();
       if (e.code !== 'Space' || e.target.closest('input, select, textarea, button, summary')) return;
       e.preventDefault();
       if (!e.repeat) press();
@@ -467,6 +597,8 @@ const Trainer = (() => {
   }
   function load(saved) { // also used when syncing brings newer data
     st = { ...structuredClone(DEFAULTS), ...saved };
+    delete st.off; // from before training followed the marks
+    delete st.show;
     if (!ALG_EVENTS[st.event]) st.event = '3x3';
     last = null;
     refresh();

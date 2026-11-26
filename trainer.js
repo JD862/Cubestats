@@ -5,18 +5,21 @@ const Trainer = (() => {
   const GREY = '#77777a', LAST_LAYER = ['oll', 'eoll', 'cpll', 'pll', 'ort', 'cll', 'pbl'], TWO = ['ort', 'cll', 'pbl'];
   // results: { caseId: [{ t, d }] } with t in ms, or null for a miss. pool: which marks are trained.
   // groups: the group last used in each event.
-  const DEFAULTS = { event: '3x3', groups: { '3x3': 'PLL' }, order: 'random', band: 'all', sort: 'set', learnt: [], learning: [], pool: 'marked', extra: {}, picture: true, listBand: 'all', listShow: 'all', caseGroup: 'all', listGroup: 'all', listPicture: true, results: {}, edits: {}, alt: {}, useAlt: [], custom: [] };
+  const DEFAULTS = { event: '3x3', methods: { '3x3': 'CFOP' }, groups: { '3x3': 'PLL' }, order: 'random', band: 'all', sort: 'set', learnt: [], learning: [], pool: 'marked', extra: {}, picture: true, listBand: 'all', listShow: 'all', caseGroup: 'all', listGroup: 'all', listPicture: true, results: {}, edits: {}, alt: {}, useAlt: [], custom: [] };
   let st = structuredClone(DEFAULTS);
   let cur = null, queue = [], phase = 'idle', started = 0, frame = 0, last = null, editing = null, ready = false;
   let picked = new Set(), anchor = null; // cases selected with Ctrl+click, and where a Shift+click range starts
 
   const store = () => ready && setKV('trainer', st).catch(() => { $('trmsg').textContent = SAVE_FAILED; });
-  const groupNames = () => [...Object.keys(ALG_EVENTS[st.event]), 'Custom', 'Learnt'];
+  const methodNames = () => Object.keys(METHODS[st.event]);
+  const method = () => (methodNames().includes(st.methods[st.event]) ? st.methods[st.event] : methodNames()[0]);
+  const groupNames = () => [...METHODS[st.event][method()], 'Custom', 'Learnt'];
+  const allCases = () => [...new Map(Object.values(ALG_EVENTS[st.event]).flat().map(c => [c.id, c])).values()]; // sets shared by methods appear once
   const group = () => (groupNames().includes(st.groups[st.event]) ? st.groups[st.event] : groupNames()[0]);
   const customCases = () => st.custom.filter(c => (c.event || '3x3') === st.event);
   const cases = () => {
     if (group() === 'Custom') return customCases();
-    if (group() === 'Learnt') return [...Object.values(ALG_EVENTS[st.event]).flat(), ...customCases()].filter(isLearnt); // every learnt case of the event
+    if (group() === 'Learnt') return [...allCases(), ...customCases()].filter(isLearnt); // every learnt case of the event
     return ALG_EVENTS[st.event][group()];
   };
   // Every case has a main alg and may have a secondary one (st.alt); useAlt lists the cases trained with the secondary.
@@ -63,10 +66,14 @@ const Trainer = (() => {
     const r = resultsOf(c), t = r.filter(x => x.t != null).map(x => x.t), s = Stats.summary(t);
     return { n: r.length, miss: r.length - t.length, avg: s.average };
   }
-  const setupState = (c, moves) => Cube.apply(c.kind === 'f2l' ? Cube.maskedF2L() : Cube.solved(), moves || Cube.invert(Cube.parse(algOf(c))));
+  // Cases on other puzzles (kind 'text') have no simulator here: no picture, and their setup is the alg read backwards.
+  const isText = c => c.kind === 'text';
+  const reverseAlg = a => (a.match(/\S+/g) || []).reverse().map(m => (m.endsWith("'") ? m.slice(0, -1) : m.endsWith('2') ? m : m + "'")).join(' ');
+  const setupState = (c, moves) => (isText(c) ? null : Cube.apply(c.kind === 'f2l' ? Cube.maskedF2L() : c.kind === 'layer1' ? Cube.maskedLayer1() : Cube.solved(), moves || Cube.invert(Cube.parse(algOf(c)))));
   // How to draw a case: 'top', 'iso', or '' when a picture would not help.
   function view(c, state) {
-    if (c.kind === 'f2l' || c.kind === 'pbl') return 'iso';
+    if (!state || isText(c)) return '';
+    if (c.kind === 'f2l' || c.kind === 'layer1' || c.kind === 'pbl') return 'iso';
     if (c.kind) return c.kind === 'blind' ? '' : 'top';
     return st.event !== '2x2' && st.event !== 'Blind' && Cube.keepsF2L(state) ? 'top' : '';
   }
@@ -117,11 +124,16 @@ const Trainer = (() => {
   function next() {
     const c = pick();
     if (!c) { cur = null; return drawCase(); }
+    if (isText(c)) {
+      const turn = ['', 'U ', "U' "][Math.floor(Math.random() * 3)]; // Pyraminx turns are thirds
+      cur = { c, text: (c.id.startsWith('L4E') ? turn : '') + reverseAlg(algOf(c)), state: null, shown: false };
+      return drawCase();
+    }
     const inv = Cube.invert(Cube.parse(algOf(c))), rnd = () => Math.floor(Math.random() * 4);
     let moves = inv;
     // A random angle and random U turn give many setups for one last-layer case; F2L only varies the U layer.
     if (LAST_LAYER.includes(c.kind) || (!c.kind && view(c, setupState(c)))) moves = [{ f: 'U', n: rnd() }, ...(c.kind === 'pbl' ? [{ f: 'D', n: rnd() }] : []), ...Cube.turnY(inv, rnd())];
-    else if (c.kind === 'f2l') moves = [{ f: 'U', n: rnd() }, ...inv];
+    else if (c.kind === 'f2l' || c.kind === 'layer1') moves = [{ f: 'U', n: rnd() }, ...inv];
     moves = Cube.simplify(moves);
     cur = { c, moves, state: setupState(c, moves), shown: false };
     drawCase();
@@ -163,8 +175,7 @@ const Trainer = (() => {
   function record(t) {
     const c = cur.c, id = c.id;
     (st.results[id] ||= []).push({ t, d: Date.now() });
-    last = { id, name: c.name, alg: algOf(c), t, before: isLearnt(c) ? 'learnt' : isLearning(c) ? 'learning' : '' };
-    if (t != null) putStatus(id, 'learnt'); // a timed solve counts as learnt; a miss changes nothing
+    last = { id, name: c.name, alg: algOf(c), t };
     store();
     next();
     drawLast();
@@ -189,7 +200,7 @@ const Trainer = (() => {
       $('trsetup').textContent = (cases().length || extraCases().length) ? ([...cases(), ...extraCases()].some(c => hasStatus(c, st.pool)) ? 'No cases match the trainer’s filters.' : NO_POOL[st.pool]) : group() === 'Learnt' ? 'Mark cases as learnt and they will appear here.' : 'Add your own algs below to train them.';
       return;
     }
-    $('trsetup').textContent = Cube.text(cur.moves) || '(already set up)';
+    $('trsetup').textContent = cur.text ?? (Cube.text(cur.moves) || '(already set up)');
     if (st.picture && view(cur.c, cur.state)) $('trpic').append(picture(cur.c, cur.state, 150));
     if (cur.c.kind === 'blind') $('trname').textContent = label(cur.c); // the letter is the prompt
     $('trshow').textContent = cur.shown ? 'Hide alg' : 'Show alg';
@@ -278,22 +289,34 @@ const Trainer = (() => {
         const err = el('div', '', 'note'), box = el('div', null, 'treditor');
         err.setAttribute('role', 'alert');
         const field = (label, control) => { const l = el('label', label); l.append(control); box.append(l); return control; };
-        // Built-in cases choose from known algs; custom cases have nothing to choose from, so they are typed.
-        const pickAlg = none => {
-          if (!c.kind) return el('input', null, 'tredit');
+        // Built-in cases choose from known algs or type their own; custom cases have nothing to choose from, so they are typed.
+        const OWN = '(own)'; // option value for typing an alg; no real alg looks like this
+        const pickAlg = (label, none, current) => {
+          const typed = el('input', null, 'tredit'), wrap = el('div', null, 'trpick');
+          typed.placeholder = "Type an alg, such as R U R' U'";
+          typed.setAttribute('aria-label', label + ', typed');
+          if (!c.kind) { typed.value = current; wrap.append(typed); return { wrap, typed, value: () => typed.value }; }
           const sel = el('select', null, 'tredit');
+          sel.setAttribute('aria-label', label);
           if (none) sel.add(new Option('None', ''));
           for (const a of options(c)) sel.add(new Option(`${Cube.grouped(a)}  – ${scores(c, a)}`, a));
-          return sel;
+          sel.add(new Option('Type your own…', OWN));
+          sel.value = current;
+          const sync = () => { typed.hidden = sel.value !== OWN; if (!typed.hidden) typed.focus(); };
+          sel.onchange = sync;
+          typed.hidden = true;
+          wrap.append(sel, typed);
+          return { wrap, typed, value: () => (sel.value === OWN ? typed.value : sel.value) };
         };
-        const main = field('Main alg', pickAlg(false)), alt = field('Secondary alg (optional)', pickAlg(true)), use = field('Train with', el('select', null, 'truse'));
-        main.value = mainAlg(c);
-        alt.value = st.alt[c.id] || '';
+        const mainPick = pickAlg('Main alg', false, mainAlg(c)), altPick = pickAlg('Secondary alg', true, st.alt[c.id] || '');
+        field('Main alg', mainPick.wrap);
+        field('Secondary alg (optional)', altPick.wrap);
+        const use = field('Train with', el('select', null, 'truse'));
         use.append(new Option('Main alg', 'main'), new Option('Secondary alg', 'alt'));
         use.value = usesAlt(c) ? 'alt' : 'main';
-        const save = () => { err.textContent = setAlgs(c, main.value, alt.value, use.value === 'alt'); };
+        const save = () => { err.textContent = setAlgs(c, mainPick.value(), altPick.value(), use.value === 'alt'); };
         const close = () => { editing = null; drawList(); };
-        for (const i of [main, alt]) i.onkeydown = e => { if (e.key === 'Enter' && i.tagName === 'INPUT') save(); };
+        for (const p of [mainPick, altPick]) p.typed.onkeydown = e => { if (e.key === 'Enter') save(); };
         box.onkeydown = e => { if (e.key === 'Escape') close(); };
         const bar = el('div', null, 'actions'), ok = el('button', 'Save', 'primary'), no = el('button', 'Cancel');
         ok.type = no.type = 'button';
@@ -395,10 +418,10 @@ const Trainer = (() => {
     let moves;
     try { moves = Cube.parse(text); } catch (e) { return e.message + '.'; }
     if (!moves.length) return 'Enter at least one move.';
-    if (!c || !c.kind) return '';
+    if (!c || !c.kind || isText(c)) return ''; // custom algs and other puzzles can only be checked for valid moves
     if (c.kind === 'blind') return Cube.apply(Cube.solved(), moves).join() === Cube.apply(Cube.solved(), Cube.parse(c.alg)).join() ? '' : `That alg does not do the same as the original for ${c.name}.`;
     const inv = Cube.invert(Cube.parse(c.alg));
-    for (let y = 0; y < (c.kind === 'f2l' ? 1 : 4); y++) {
+    for (let y = 0; y < (c.kind === 'f2l' || c.kind === 'layer1' ? 1 : 4); y++) {
       for (let a = 0; a < 4; a++) {
         const s = Cube.apply(Cube.solved(), [...Cube.turnY(inv, y), { f: 'U', n: a }, ...moves]);
         if (Cube.reached(c.kind, s)) return '';
@@ -477,11 +500,17 @@ const Trainer = (() => {
     picked.clear();
     anchor = null;
     $('trevent').value = st.event;
+    $('trmethod').replaceChildren(...methodNames().map(m => new Option(m, m)));
+    $('trmethod').value = method();
+    $('trmethodbox').hidden = methodNames().length < 2;
     $('trset').replaceChildren(...groupNames().map(g => new Option(g, g)));
     $('trset').value = group();
-    $('trhold').textContent = st.event === 'Blind'
-      ? 'Do this setup on a solved cube, then run the alg for the letter. Letters are Speffz; buffers are DF for edges and UBL for corners.'
-      : `Hold a solved ${st.event === '2x2' ? '2x2' : 'cube'} with yellow on top and green in front, then do this setup:`;
+    $('trhold').textContent = {
+      Blind: 'Do this setup on a solved cube, then run the alg for the letter. Letters are Speffz; buffers are DF for edges and UBL for corners.',
+      Pyraminx: 'Hold a solved Pyraminx with one corner on top and a face toward you, then do this setup. U is the top corner, L and R the front corners. Tips are left out.',
+      '4x4': 'Hold a solved 4x4 with yellow on top and green in front, then do this setup. r and l turn the inner slice only; Rw and Uw turn two layers.',
+      '5x5': 'Hold a solved 5x5 with yellow on top and green in front, then do this setup. r and l turn the second layer only; Rw and Uw turn two layers.',
+    }[st.event] || `Hold a solved ${st.event === '2x2' ? '2x2' : 'cube'} with yellow on top and green in front, then do this setup:`;
     $('trorder').value = st.order;
     $('trband').value = st.band;
     $('trsort').value = st.sort;
@@ -515,6 +544,7 @@ const Trainer = (() => {
     $('trevent').append(...Object.keys(ALG_EVENTS).map(e => new Option(e, e)));
     $('trevent').onchange = () => { st.event = $('trevent').value; $('trevent').blur(); refresh(); store(); };
     for (const p of ['stats', 'trainer']) $('nav-' + p).onclick = () => showPage(p);
+    $('trmethod').onchange = () => { st.methods = { ...st.methods, [st.event]: $('trmethod').value }; $('trmethod').blur(); refresh(); store(); };
     $('trset').onchange = () => { st.groups = { ...st.groups, [st.event]: $('trset').value }; $('trset').blur(); refresh(); store(); };
     $('trorder').onchange = () => { st.order = $('trorder').value; $('trorder').blur(); queue = []; if (phase === 'idle') next(); store(); drawList(); };
     $('trband').onchange = () => { st.band = $('trband').value; $('trband').blur(); selectionChanged(); };
@@ -546,7 +576,6 @@ const Trainer = (() => {
     $('trundo').onclick = () => { // removes the last attempt
       st.results[last.id]?.pop();
       if (!st.results[last.id]?.length) delete st.results[last.id];
-      if (last.t != null && st.learnt.includes(last.id)) putStatus(last.id, last.before); // back to the mark it had
       last = null;
       drawLast();
       selectionChanged();

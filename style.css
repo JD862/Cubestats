@@ -123,3 +123,4 @@ button.alg:hover{text-decoration:underline}
 .algbody .primary:disabled{opacity:.45}
 #sidebar strong{display:flex;align-items:center;gap:8px}
 #sidebar strong img{flex:none;border-radius:6px}
+.trpick{display:grid;gap:6px}

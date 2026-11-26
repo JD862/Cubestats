@@ -1,5 +1,15 @@
 'use strict';
 /* Events and alg groups for the trainer. `kind` says what an alg has to achieve (see Cube.reached). */
+// Methods of each event and the sets they use, in order. Custom and Learnt are added to every method.
+const METHODS = {
+  '3x3': { Beginner: ['First layer', 'Second layer', '2-look OLL', '2-look PLL'], CFOP: ['F2L', '2-look OLL', 'OLL', '2-look PLL', 'PLL'] },
+  '2x2': { Ortega: ['Ortega OLL', 'Ortega PBL'], CLL: ['CLL'] },
+  OH: { CFOP: ['F2L', '2-look OLL', 'OLL', '2-look PLL', 'PLL'] },
+  Blind: { 'M2 and Old Pochmann': ['M2 edges', 'OP corners'] },
+  '4x4': { Reduction: ['Parity', '2-look OLL', 'OLL', '2-look PLL', 'PLL'] },
+  '5x5': { Reduction: ['Edge parity', '2-look OLL', 'OLL', '2-look PLL', 'PLL'] },
+  Pyraminx: { L4E: ['L4E'] },
+};
 const ALG_EVENTS = (() => {
   const list = (id, prefix, kind, src) => src.trim().split('\n').map(l => {
     const [n, a] = l.trim().split(': ');
@@ -62,8 +72,16 @@ const ALG_EVENTS = (() => {
     { id: '2PLL Diagonal', name: 'Corners: Diagonal', alg: pll('Y'), kind: 'cpll' },
     ...['Ua', 'Ub', 'H', 'Z'].map(n => ({ id: '2PLL ' + n, name: 'Edges: ' + n, alg: pll(n), kind: 'pll' })),
   ];
+  // Beginner method: a first-layer corner, then a second-layer edge, each above the front right.
+  const BEGINNER1 = list('BEG1', 'Corner: ', 'layer1', `
+    White facing right: R U R'
+    White facing front: F' U' F
+    White on top: R U2 R' U' R U R'`);
+  const BEGINNER2 = list('BEG2', 'Edge to the ', 'f2l', `
+    right: U R U' R' U' F' U F
+    left: U' L' U L U F U' F'`);
   const three = {
-    F2L, '2-look OLL': OLL2, OLL: ALG_SETS.OLL.map(c => ({ ...c, kind: 'oll' })),
+    'First layer': BEGINNER1, 'Second layer': BEGINNER2, F2L, '2-look OLL': OLL2, OLL: ALG_SETS.OLL.map(c => ({ ...c, kind: 'oll' })),
     '2-look PLL': PLL2, PLL: ALG_SETS.PLL.map(c => ({ ...c, kind: 'pll' })),
   };
 
@@ -204,6 +222,7 @@ const ALG_EVENTS = (() => {
   function caseGroup(c) {
     const id = c.id.replace(/^OH /, ''), rest = id.slice(id.indexOf(' ') + 1);
     if (id.startsWith('F2L ') || id.startsWith('CLL ')) return rest.replace(/ \d+$/, '');
+    if (id.startsWith('BEG')) return id.startsWith('BEG1') ? 'Corner' : 'Edge';
     if (/^2(O|P)LL /.test(id)) return c.name.split(':')[0];
     if (id.startsWith('OLL ')) return groupIn(OLL_GROUPS, +rest);
     if (id.startsWith('PLL ')) return groupIn(PLL_GROUPS, rest);
@@ -216,5 +235,55 @@ const ALG_EVENTS = (() => {
     const order = [...new Set(g === 'OLL' ? Object.keys(OLL_GROUPS) : g === 'PLL' ? Object.keys(PLL_GROUPS) : groups[g].map(c => c.group))];
     groups[g].sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group)); // keeps the order inside a group
   }
-  return { '3x3': three, '2x2': two, OH: oh, Blind: blind };
+  /* Bigger cubes and Pyraminx. Their algs are checked by separate simulators, not by cube.js, so their kind is 'text'. */
+  const copy = prefix => Object.fromEntries(['2-look OLL', 'OLL', '2-look PLL', 'PLL'].map(g => [g, three[g].map(c => ({ ...c, id: prefix + c.id }))]));
+  const big4 = {
+    Parity: list('P4', '', 'text', `
+    OLL parity: r2 B2 U2 l U2 r' U2 r U2 F2 r F2 l' B2 r2
+    PLL parity: Uw2 Rw2 U2 r2 U2 Rw2 Uw2`), ...copy('4x4 '),
+  };
+  const big5 = { 'Edge parity': list('P5', '', 'text', `
+    Edge parity: r2 B2 U2 l U2 r' U2 r U2 F2 r F2 l' B2 r2`), ...copy('5x5 ') };
+  const pyraminx = { L4E: list('L4E', 'L4E ', 'text', `
+    1: R U' R'
+    2: R U R'
+    3: L' U' L
+    4: L' U L
+    5: R' L R L'
+    6: L R' L' R
+    7: L R U R' U' L'
+    8: L U R U' R' L'
+    9: R U R L R L'
+    10: R U' R' L' U' L
+    11: R U R' L' U' L
+    12: R U' R L R L'
+    13: L R' L' R' U' R'
+    14: L' U L R U' R'
+    15: L' U L R U R'
+    16: L' U L' R' L' R
+    17: R' U' R U' R' U' R
+    18: R' U R U R' U R
+    19: R U R' U R U' R'
+    20: L U' R U R' U L'
+    21: R U' R' U' L' U L
+    22: R' L' R' U R L R
+    23: R U R' L R' L' R
+    24: R U' R' U L' U' L
+    25: R U R' U L' U L
+    26: L' U' L U' R U' R'
+    27: L' U L U' R U R'
+    28: L' U L U L' U' L
+    29: L R' L' R U' R U' R'
+    30: R U R L' U' L U R
+    31: L' U L' R' L' R' U R'
+    32: L U R U' R' L U L
+    33: L R' L R' U' R L R
+    34: L R U R' U' L U' L
+    35: R L' U' R U' L' R' U L R' L`) };
+  for (const groups of [big4, big5, pyraminx]) for (const g in groups) for (const c of groups[g]) {
+    c.alts = [...new Set([c.alg, ...altsFor(c.id.replace(/^[45]x[45] /, ''))])];
+    c.group = c.kind === 'text' ? (c.id.startsWith('L4E') ? `${c.alg.split(' ').length} moves` : 'Parity') : caseGroup({ ...c, id: c.id.replace(/^[45]x[45] /, '') });
+    c.set = g;
+  }
+  return { '3x3': three, '2x2': two, OH: oh, Blind: blind, '4x4': big4, '5x5': big5, Pyraminx: pyraminx };
 })();

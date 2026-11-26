@@ -127,6 +127,7 @@ const Cube = (() => {
   function reached(kind, state) {
     switch (kind) {
       case 'f2l': return keepsF2L(state);
+      case 'layer1': return stickers.every((s, i) => s.p[1] !== -1 || state[i] === s.f); // bottom layer solved
       case 'oll': return keepsF2L(state) && oriented(state);
       case 'eoll': return keepsF2L(state) && stickers.every((s, i) => CORNER[i] || s.f !== 'U' || state[i] === 'U');
       case 'cpll': return keepsF2L(state) && oriented(state) && anyTurn(state, 'U', cornersDone);
@@ -138,6 +139,8 @@ const Cube = (() => {
     }
   }
   // Solved cube with the last-layer pieces marked X, so only the first two layers are coloured.
+  // Solved cube with only the bottom layer coloured, for first-layer cases.
+  const maskedLayer1 = () => stickers.map(s => (s.p[1] !== -1 && !(s.p[0] === 0 && s.p[2] === 0) ? 'X' : s.f));
   const maskedF2L = () => stickers.map(s => (s.p[1] === 1 && !(s.p[0] === 0 && s.p[2] === 0) ? 'X' : s.f));
   // Corner points of the visible U, F and R stickers, seen from the front right.
   function isoView(state, two) {
@@ -168,7 +171,7 @@ const Cube = (() => {
     }
     return cells;
   }
-  return { solved, apply, parse, simplify, invert, turnY, text, grouped, difficulty, efficiency, keepsF2L, reached, maskedF2L, isoView, topView };
+  return { solved, apply, parse, simplify, invert, turnY, text, grouped, difficulty, efficiency, keepsF2L, reached, maskedF2L, maskedLayer1, isoView, topView };
 })();
 
 const ALG_SETS = (() => {

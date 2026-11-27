@@ -124,3 +124,15 @@ button.alg:hover{text-decoration:underline}
 #sidebar strong{display:flex;align-items:center;gap:8px}
 #sidebar strong img{flex:none;border-radius:6px}
 .trpick{display:grid;gap:6px}
+#wca tr.compoff td{opacity:.45}
+#wca .card .actions h2{margin:0 8px 0 0}
+.evbody,#evlist{display:grid;gap:12px}
+.evbody h2,.evbody p{margin:0}
+#mgrtable tr[data-id]{cursor:pointer}
+#mgrtable tr.chosen td{background:color-mix(in srgb,var(--s1) 28%,var(--surface))}
+#mgrbar{margin-top:12px;padding:10px 12px;border:1px solid var(--ink2);border-radius:8px}
+.mgrbody .note{margin-top:10px}
+.evrow{display:grid;grid-template-columns:2fr 1fr;gap:10px;border:1px solid var(--line);border-radius:8px;padding:8px 12px 12px;margin:0;min-width:0}
+.evrow legend{font-size:13px;color:var(--ink2);padding:0 4px}
+.evrow label,.evrow input,.evrow select{min-width:0;width:100%}
+@media(max-width:520px){.evrow{grid-template-columns:1fr}}

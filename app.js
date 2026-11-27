@@ -57,14 +57,75 @@ async function importAll(sources) { // [{ name, read }]
   if (count) { fillSessions(first); if (!(await save())) notes.push(SAVE_FAILED); }
   if (wcaData) { await WCA.use(wcaData); if (!count && !notes.length) return; }
   say([wcaData ? 'Imported WCA results.' : '', count ? `Imported ${count.toLocaleString()} solves.` : '', ...notes].filter(Boolean).join(' · '));
+  const added = sessions.slice(first).filter(s => !s.wca);
+  if (added.length) askEvents(added);
 }
+
+/* ---------- choosing the event of newly imported sessions ---------- */
+// A likely event from a session's name, such as "csTimer 3x3 OH" or "2x2 practice".
+function guessEvent(name) {
+  const n = name.toLowerCase().replace(/[_-]/g, ' ');
+  const rules = [[/\boh\b|one.?hand/, '333oh'], [/\b(3bld|bld|blind)/, '333bf'], [/(?<!\d)(2x2|222)(?!\d)/, '222'], [/(?<!\d)(4x4|444)(?!\d)/, '444'], [/(?<!\d)(5x5|555)(?!\d)/, '555'],
+    [/(?<!\d)(6x6|666)(?!\d)/, '666'], [/(?<!\d)(7x7|777)(?!\d)/, '777'], [/pyra/, 'pyram'], [/skewb/, 'skewb'], [/mega|minx/, 'minx'], [/sq.?1|square/, 'sq1'], [/clock/, 'clock'], [/(?<!\d)(3x3|333)(?!\d)/, '333']];
+  return rules.find(([re]) => re.test(n))?.[1] || '';
+}
+function askEvents(list) {
+  $('evlist').replaceChildren(...list.map(s => {
+    const row = el('fieldset', null, 'evrow'), name = el('input'), sel = el('select'), nl = el('label', 'Name'), elab = el('label', 'Event');
+    row.append(el('legend', `${s.solves.length.toLocaleString()} solves`));
+    name.value = s.name;
+    name.maxLength = 100;
+    name.dataset.id = s.id;
+    sel.append(new Option('No event', ''), ...WCA.allEvents().map(e => new Option(WCA.eventName(e), e)));
+    sel.value = guessEvent(s.name);
+    sel.dataset.id = s.id;
+    name.oninput = () => { if (!sel.dataset.touched) sel.value = guessEvent(name.value) || sel.value; }; // a new name can suggest the event
+    sel.onchange = () => { sel.dataset.touched = '1'; };
+    nl.append(name);
+    elab.append(sel);
+    row.append(nl, elab);
+    return row;
+  }));
+  $('evdlg').showModal();
+  $('evlist').querySelector('select')?.focus();
+}
+$('evsave').onclick = async () => {
+  for (const sel of $('evlist').querySelectorAll('select')) { const s = sessions.find(x => x.id === sel.dataset.id); if (s) s.wca = sel.value; }
+  for (const input of $('evlist').querySelectorAll('input')) {
+    const s = sessions.find(x => x.id === input.dataset.id), name = input.value.trim();
+    if (s && name) s.name = name; // an empty name keeps the old one
+  }
+  $('evdlg').close();
+  fillSessions($('session').value);
+  if (!(await save())) say(SAVE_FAILED);
+};
+$('evskip').onclick = () => $('evdlg').close();
 const importFiles = files => importAll(files.map(f => ({ name: f.name, read: () => Import.fromFile(f) })));
 
+// A full event: every session set to that event, read together. Combined copies (with .from) are left out so no solve counts twice. It is worked out each time, never saved.
+const fullCache = new Map();
+function fullEvent(id) {
+  const list = sessions.filter(s => s.wca === id && !s.from), key = list.map(s => `${s.id}:${s.solves.length}`).join();
+  if (fullCache.get(id)?.key !== key) {
+    const all = list.flatMap(s => s.solves);
+    fullCache.set(id, { key, value: { full: true, id: 'event:' + id, name: `Full event: ${WCA.eventName(id)}`, wca: id, count: list.length,
+      solves: all.every(s => s.date != null) ? all.slice().sort((a, b) => a.date - b.date) : all } });
+  }
+  return fullCache.get(id).value;
+}
+const fullEventIds = () => [...new Set(sessions.map(s => s.wca).filter(Boolean))].filter(id => sessions.filter(s => s.wca === id && !s.from).length > 1);
 function fillOptions(sel) {
   $('session').replaceChildren(...sessions.map((s, i) => new Option(`${s.name} (${s.solves.length.toLocaleString()})`, i)));
+  if (fullEventIds().length) {
+    const g = document.createElement('optgroup');
+    g.label = 'Full events (all sessions of an event)';
+    for (const id of fullEventIds()) { const f = fullEvent(id); g.append(new Option(`${f.name} – ${f.count} sessions (${f.solves.length.toLocaleString()})`, f.id)); }
+    $('session').append(g);
+  }
   WCA.addOptions($('session'));
   const any = !!sessions.length || WCA.has();
   if (any) $('session').value = !sessions.length && !WCA.isWca(sel) ? WCA.firstEvent() : String(sel);
+  if (any && !$('session').value) $('session').value = sessions.length ? '0' : WCA.firstEvent(); // the chosen full event no longer exists
   $('empty').hidden = any;
   $('main').hidden = !any;
   $('remove').disabled = $('export').disabled = !any;
@@ -79,7 +140,7 @@ function fillSessions(sel) {
 }
 function current() {
   const v = $('session').value;
-  return WCA.solvesFor(v, WCA.isWca(v) ? [] : sessions[+v]?.solves ?? []);
+  return WCA.solvesFor(v, WCA.isWca(v) ? [] : v.startsWith('event:') ? fullEvent(v.slice(6)).solves : sessions[+v]?.solves ?? []);
 }
 function resetRange() {
   const n = current().length, p = $('preset').value;
@@ -144,7 +205,10 @@ function render() {
     series.push({ label, vals, rec });
   };
   push('Single', Float64Array.from(times));
-  for (const n of parseSizes()) push(`Average of ${n}`, Stats.rolling(times, n, dnfMode));
+  const v = $('session').value;
+  const compOnly = WCA.isWca(v) || (!$('showbox').hidden && $('show').value === 'in'); // only competition solves are shown
+  if (compOnly) push('Official average (best per competition)', perComp(solves, v)); // official averages only, one per competition
+  else for (const n of parseSizes()) push(`Average of ${n}`, Stats.rolling(times, n, dnfMode));
   const tr = (cells, tag) => { const r = el('tr'); r.append(...cells.map(c => el(tag, c))); return r; };
   $('table').replaceChildren(tr(['', 'Current', 'Best', 'Set at solve', 'Times improved'], 'th'), ...rows.map(r => tr(r, 'td')));
   view = { lo, solves, series };
@@ -152,18 +216,53 @@ function render() {
   const pair = WCA.renderInto($('wca'), solves, toMs, parseSizes(), dnfMode, digits);
   $('charts').replaceChildren();
   plots = [];
-  if (pair) card('Distribution, in comp and out of comp', WCA.compareChart(pair.out, pair.in), [['--s1', 'Out of comp'], ['--s2', 'In comp']]);
+  if (pair) { // In and out of comp: only the charts that compare the two
+    card('Distribution, in comp and out of comp', WCA.compareChart(pair.out, pair.in), [['--s1', 'Out of comp'], ['--s2', 'In comp']]);
+    for (const [title, plot, legend, note] of Compare.cards(pair)) card(title, plot, legend, note);
+    return draw();
+  }
   for (const s of series) card(s.label, lineChart(s, lo), [['--s1', s.label], ['--s2', 'Best so far']]);
+  if (compOnly) { const years = compsPerYear(solves, v); if (years.length) card('Competitions per year', barChart(years, 'competitions')); }
   card('Distribution', barChart(histogram(times)));
   const days = activity(solves);
   if (days.length) card('Solves per day', barChart(days));
   draw();
 }
-function card(title, plot, legend) {
+// How many competitions there were each year, counting years with none so gaps show.
+function compsPerYear(solves, v) {
+  const by = new Map();
+  for (const s of solves) {
+    const r = WCA.roundOf(s, v);
+    if (!r || r.date == null) continue;
+    const y = new Date(r.date).getFullYear();
+    if (!by.has(y)) by.set(y, new Set());
+    by.get(y).add(r.id);
+  }
+  if (!by.size) return [];
+  const first = Math.min(...by.keys()), last = Math.max(...by.keys()), out = [];
+  for (let y = first; y <= last; y++) out.push({ n: by.get(y)?.size || 0, label: String(y), tip: String(y) });
+  return out;
+}
+// The best official average of each competition, shown from its last solve until the next competition.
+function perComp(solves, v) {
+  const out = new Float64Array(solves.length).fill(NaN), best = new Map(), last = new Map();
+  solves.forEach((s, i) => {
+    const r = WCA.roundOf(s, v);
+    if (!r) return;
+    if (!Number.isNaN(r.avg)) best.set(r.id, Math.min(best.get(r.id) ?? Infinity, r.avg)); // NaN: a round with no average
+    last.set(r.id, i);
+  });
+  let value = NaN;
+  const at = new Map([...last].filter(([id]) => best.has(id)).map(([id, i]) => [i, best.get(id)]));
+  for (let i = 0; i < solves.length; i++) { if (at.has(i)) value = at.get(i); out[i] = value; }
+  return out;
+}
+function card(title, plot, legend, note) {
   const c = el('section', null, 'card'), cv = el('canvas');
   cv.setAttribute('role', 'img');
   cv.setAttribute('aria-label', title + ' chart');
   c.append(el('h2', title));
+  if (note) c.append(el('p', note, 'note'));
   if (legend) {
     const l = el('div', null, 'legend');
     for (const [color, name] of legend) { const s = el('span'); s.append(keyFor(color), name); l.append(s); }
@@ -313,12 +412,12 @@ function lineChart(s, lo) {
     },
   };
 }
-function barChart(bars) {
+function barChart(bars, unit = 'solves') {
   const n = bars.length, max = bars.reduce((a, b) => Math.max(a, b.n), 1);
   return {
     count: n,
     index: (px, w) => Math.max(0, Math.min(n - 1, Math.floor((px - L) / (w - L - R) * n))),
-    tip: i => ({ title: bars[i].tip, rows: [['--s1', 'solves', bars[i].n.toLocaleString()]] }),
+    tip: i => ({ title: bars[i].tip, rows: [['--s1', unit, bars[i].n.toLocaleString()]] }),
     draw(hover) {
       const { g, w, h, pw, ph } = setup(this);
       if (!n) return noData(g, w, h);
@@ -401,6 +500,7 @@ function ask(text, yes, no = 'Cancel') {
 $('remove').onclick = async () => {
   const v = $('session').value;
   if (WCA.isWca(v)) return WCA.removeAll();
+  if (v.startsWith('event:')) return say('A full event is made from your sessions, so it cannot be removed. Change or remove its sessions in the session manager.');
   if (!(await ask(`Remove "${sessions[+v].name}" from Cubestats? Your original files are not touched.`, 'Remove'))) return;
   sessions.splice(+v, 1);
   fillSessions(0);

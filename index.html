@@ -100,6 +100,11 @@
 </form></dialog>
 <dialog id="mgr" aria-labelledby="mgrtitle"><div class="mgrbody"><h2 id="mgrtitle">Session Manager</h2>
   <div class="scroll"><table id="mgrtable"></table></div>
+  <p class="note">Click a row to select it. Ctrl+click (Cmd+click on a Mac) adds more rows, and Shift+click selects a range.</p>
+  <div id="mgrbar" class="actions" role="toolbar" aria-label="Selected sessions"><b id="mgrcount" role="status"></b>
+    <button type="button" id="mgrcombine">Combine into a new session</button>
+    <select id="mgrevent" aria-label="Set the event of the selected sessions"></select>
+    <button type="button" id="mgrremove">Remove</button><button type="button" id="mgrdeselect">Deselect</button></div>
   <div class="actions"><button type="button" id="mgrclose">Close</button></div></div></dialog>
 <dialog id="wcadlg"><form id="wcaform"><h2>Import from WCA</h2>
   <label>WCA ID<input id="wcaid" autocomplete="off" spellcheck="false" placeholder="2009ABCD01"></label>
@@ -135,9 +140,13 @@
   <div id="algpic"></div><div id="algtext"></div><p id="algnote" class="note"></p>
   <label id="algpickbox">Alg<select id="algpick"></select></label>
   <div class="actions center"><button type="button" id="alguse" class="primary">Train with this alg</button><button type="button" id="algalt">Set as secondary</button><button type="button" id="algclose">Close</button></div></div></dialog>
+<dialog id="evdlg" aria-labelledby="evtitle"><div class="evbody"><h2 id="evtitle">Name and event</h2>
+  <p class="note">Rename the imported sessions if you like, and choose their event. The event lets Cubestats compare them with your WCA results and group them into a full event. You can change it later in the session manager.</p>
+  <div id="evlist"></div>
+  <div class="actions"><button type="button" id="evsave" class="primary">Save</button><button type="button" id="evskip">Skip</button></div></div></dialog>
 <dialog id="ask" aria-labelledby="asktext"><p id="asktext"></p>
   <div class="actions"><button type="button" id="askno">Cancel</button><button type="button" id="askyes" class="primary"></button></div></dialog>
 <div id="tip" hidden></div>
-<script src="stats.js"></script><script src="import.js"></script><script src="sync.js"></script><script src="wca.js"></script><script src="app.js"></script><script src="manager.js"></script><script src="cube.js"></script><script src="alts.js"></script><script src="algs.js"></script><script src="trainer.js"></script>
+<script src="stats.js"></script><script src="import.js"></script><script src="sync.js"></script><script src="wca.js"></script><script src="compare.js"></script><script src="app.js"></script><script src="manager.js"></script><script src="cube.js"></script><script src="alts.js"></script><script src="algs.js"></script><script src="trainer.js"></script>
 </body>
 </html>

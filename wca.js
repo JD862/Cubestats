@@ -49,6 +49,7 @@ const WCA = (() => {
   }
   const total = () => (data ? Object.values(data.events).reduce((a, e) => a + e.solves.length, 0) : 0);
   async function use(d) {
+    if (data?.id && data.id === d.id && data.off) d.off = data.off; // a fresh download keeps the competitions turned off
     data = d;
     const ok = await setKV('wca', d).then(() => true, () => false);
     const practice = linked() || sessions[+$('session').value] || sessions[0];
@@ -62,7 +63,7 @@ const WCA = (() => {
   const firstEvent = () => { const ids = eventIds(); return ids.length ? 'wca:' + (ids.includes('333') ? '333' : ids[0]) : ''; };
   const isWca = v => String(v).startsWith('wca:');
   const eventOf = v => data?.events[v.slice(4)];
-  const linked = () => { const v = $('session').value; return v === '' || isWca(v) ? null : sessions[+v]; };
+  const linked = () => { const v = $('session').value; return v === '' || isWca(v) ? null : v.startsWith('event:') ? fullEvent(v.slice(6)) : sessions[+v]; };
 
   function addOptions(select) {
     if (!data) return;
@@ -78,7 +79,7 @@ const WCA = (() => {
     if (on && s.wca && !ids.includes(s.wca)) ids.push(s.wca); // set in the session manager, no WCA results for it
     $('wcaevent').replaceChildren(new Option('None', ''), ...ids.map(e => new Option(eventName(e), e)));
     $('wcaevent').value = on && s.wca ? s.wca : '';
-    $('linkbox').hidden = !on;
+    $('linkbox').hidden = !on || s.full; // a full event's event is fixed
     $('showbox').hidden = !on || !data.events[s.wca];
   }
   function link() {
@@ -88,12 +89,23 @@ const WCA = (() => {
     save().then(ok => { if (!ok) say(SAVE_FAILED); });
   }
   // Solves for the current selection, given the practice solves of the selected session.
+  // Competitions turned off are left out of every WCA number and chart. data.off holds their ids.
+  const offComps = () => new Set(data?.off || []);
+  const kept = ev => { const off = offComps(); return off.size ? ev.solves.filter(s => !off.has(ev.rounds[s.r].id)) : ev.solves; };
+  async function setOff(ids, off) {
+    const now = offComps();
+    for (const id of ids) if (off) now.add(id); else now.delete(id);
+    data = { ...data, off: [...now] };
+    const ok = await setKV('wca', data).then(() => true, () => false);
+    render();
+    if (!ok) say(SAVE_FAILED);
+  }
   function solvesFor(v, practice) {
-    if (isWca(v)) return eventOf(v)?.solves ?? [];
+    if (isWca(v)) return eventOf(v) ? kept(eventOf(v)) : [];
     const ev = data?.events[linked()?.wca], show = $('show').value;
     if (!ev || show === 'out') return practice;
-    if (show === 'in') return ev.solves;
-    const all = ev.solves.concat(practice);
+    if (show === 'in') return kept(ev);
+    const all = kept(ev).concat(practice);
     return all.every(s => s.date != null) ? all.sort((a, b) => a.date - b.date) : all;
   }
 
@@ -112,7 +124,8 @@ const WCA = (() => {
     const v = $('session').value, ev = isWca(v) ? eventOf(v) : data?.events[linked()?.wca];
     if (!ev) return null;
     const inC = solves.filter(s => s.src === 'wca'), out = solves.filter(s => s.src !== 'wca');
-    if (!inC.length) return null;
+    const off = offComps(), anyOff = ev.rounds.some(r => off.has(r.id));
+    if (!inC.length && !(anyOff && (isWca(v) || $('show').value !== 'out'))) return null;
     const fmt = x => format(x, digits), used = [...new Set(inC.map(s => s.r))].map(k => ev.rounds[k]);
     let best = Infinity;
     for (const r of used) if (r.avg < best) best = r.avg;
@@ -126,7 +139,7 @@ const WCA = (() => {
       for (const n of sizes) o[`Best average of ${n}`] = Stats.records(Stats.rolling(t, n, dnfMode)).best;
       return o;
     };
-    if (both) {
+    if (both && inC.length) {
       const a = stats(out), b = stats(inC), c = stats(solves), show = x => (typeof x === 'string' ? x : fmt(x));
       const rows = Object.keys(a).map(k => [k, show(a[k]), show(b[k]), show(c[k]), typeof a[k] === 'string' ? '' : signed(b[k], a[k], digits)]);
       const c1 = el('section', null, 'card');
@@ -134,9 +147,16 @@ const WCA = (() => {
       box.append(c1);
     }
 
-    const c2 = el('section', null, 'card'), comps = new Set(used.map(r => r.id)).size;
-    c2.append(el('h2', 'WCA competitions'));
-    c2.append(el('p', `${comps.toLocaleString()} competitions, ${used.length.toLocaleString()} rounds. Best official average: ${fmt(best)}.`, 'note'));
+    const c2 = el('section', null, 'card'), comps = new Set(used.map(r => r.id)).size, allComps = [...new Set(ev.rounds.map(r => r.id))];
+    const head = el('div', null, 'actions'), allOn = el('button', 'All on'), allOff = el('button', 'All off');
+    allOn.type = allOff.type = 'button';
+    allOn.onclick = () => setOff(allComps, false);
+    allOff.onclick = () => setOff(allComps, true);
+    head.append(el('h2', 'WCA competitions'), allOn, allOff);
+    c2.append(head);
+    const offCount = allComps.filter(id => off.has(id)).length;
+    c2.append(el('p', `${comps.toLocaleString()} competitions, ${used.length.toLocaleString()} rounds. Best official average: ${used.length ? fmt(best) : '–'}.` +
+      (offCount ? ` ${offCount.toLocaleString()} turned off and left out of every number and chart.` : ' Untick a competition to leave it out.'), 'note'));
     const practice = linked() ? linked().solves.filter(s => s.date != null && s.pen !== 'DNF').sort((a, b) => a.date - b.date) : [];
     const dates = practice.map(s => s.date);
     const at = x => { let lo = 0, hi = dates.length; while (lo < hi) { const m = (lo + hi) >> 1; if (dates[m] < x) lo = m + 1; else hi = m; } return lo; };
@@ -146,16 +166,24 @@ const WCA = (() => {
       return part.length ? Stats.summary(part.map(toMs)).average : NaN;
     };
     const cache = new Map(), withPractice = practice.length > 0;
-    const rows = used.slice().reverse().map(r => {
+    const t = el('table'), tr = (cells, tag) => { const r = el('tr'); r.append(...cells.map(c => (c instanceof Node ? (() => { const d = el(tag); d.append(c); return d; })() : el(tag, c)))); return r; };
+    t.append(tr(['Use', 'Competition', 'Date', 'Round', 'Place', 'Single', 'Official average', ...(withPractice ? ['Practice, 30 days before', 'Comp vs practice'] : [])], 'th'));
+    for (const r of ev.rounds.slice().reverse()) { // every round of the event, newest first, so turned-off ones can be turned back on
       if (!cache.has(r.id)) cache.set(r.id, withPractice ? before(r) : NaN);
-      const p = cache.get(r.id);
-      return [r.comp, r.date == null ? '–' : dayKey(new Date(r.date)), r.round, r.pos ? '#' + r.pos : '–', fmt(r.best), fmt(r.avg), ...(withPractice ? [fmt(p), signed(r.avg, p, digits)] : [])];
-    });
-    const t = table(['Competition', 'Date', 'Round', 'Place', 'Single', 'Official average', ...(withPractice ? ['Practice, 30 days before', 'Comp vs practice'] : [])], rows);
-    t.classList.add('tall');
-    c2.append(t);
+      const p = cache.get(r.id), on = !off.has(r.id), box = el('input');
+      box.type = 'checkbox';
+      box.checked = on;
+      box.setAttribute('aria-label', `Use ${r.comp}`);
+      box.onchange = () => setOff([r.id], !box.checked);
+      const row = tr([box, r.comp, r.date == null ? '–' : dayKey(new Date(r.date)), r.round, r.pos ? '#' + r.pos : '–', fmt(r.best), fmt(r.avg), ...(withPractice ? [fmt(p), signed(r.avg, p, digits)] : [])], 'td');
+      if (!on) row.className = 'compoff';
+      t.append(row);
+    }
+    const scroll = el('div', null, 'scroll tall');
+    scroll.append(t);
+    c2.append(scroll);
     box.append(c2);
-    return both ? { out: out.map(toMs), in: inC.map(toMs) } : null;
+    return both ? { out: out.map(toMs), in: inC.map(toMs), outSolves: out, inSolves: inC, toMs, v, dnfMode, digits } : null;
   }
 
   // Share of solves per time bucket, practice beside competition.
